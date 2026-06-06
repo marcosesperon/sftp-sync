@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -76,6 +81,7 @@ const DEFAULT_SETTINGS: Settings = {
   showTray: true,
   autostartWatchers: false,
   launchAtLogin: false,
+  verifyHostKey: true,
 };
 
 // Aplica el tema visual a la ventana y al documento.
@@ -107,14 +113,31 @@ function App() {
   const [logTab, setLogTab] = useState<"activity" | "commands" | "explorer">(
     "activity"
   );
+  const [editTab, setEditTab] = useState<
+    "connection" | "sync" | "notifications"
+  >("connection");
   const [showAbout, setShowAbout] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [hostKeyPrompt, setHostKeyPrompt] = useState<{
+    fingerprint: string;
+    changed: boolean;
+  } | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [explorerPath, setExplorerPath] = useState<string>("");
   const [explorerEntries, setExplorerEntries] = useState<RemoteEntry[]>([]);
   const [explorerLoading, setExplorerLoading] = useState(false);
   const [explorerError, setExplorerError] = useState<string>("");
   const [explorerLoadedId, setExplorerLoadedId] = useState<string | null>(null);
+  const [explorerSel, setExplorerSel] = useState<Set<string>>(new Set());
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [renameName, setRenameName] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [logHeight, setLogHeight] = useState<number>(() => {
+    const v = Number(localStorage.getItem("logHeight"));
+    return v >= 140 ? v : 280;
+  });
 
   const lang: Lang = (settings.language as Lang) || detectLang();
   const t = makeT(lang);
@@ -128,13 +151,57 @@ function App() {
   explorerPathRef.current = explorerPath;
   const loadExplorerRef = useRef<(p: string) => void>(() => {});
   loadExplorerRef.current = loadExplorer;
+  const selectedProfileRef = useRef<Profile | null>(null);
+  const uploadDroppedRef = useRef<(paths: string[]) => void>(() => {});
   const explorerRefreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
   const logEndRef = useRef<HTMLDivElement>(null);
   const cmdEndRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
+  selectedProfileRef.current = selected;
+
+  // Habilitado de acciones según los datos cumplimentados.
+  const authOk =
+    !!selected &&
+    (selected.auth.type === "key"
+      ? selected.auth.privateKeyPath.trim() !== ""
+      : selected.auth.password !== "");
+  const canConnect =
+    !!selected &&
+    selected.host.trim() !== "" &&
+    selected.username.trim() !== "" &&
+    authOk;
+  const canSync =
+    canConnect &&
+    !!selected &&
+    selected.localRoot.trim() !== "" &&
+    selected.remotePath.trim() !== "";
+
+  // Arrastrar el borde superior del panel inferior para redimensionarlo.
+  function startResize(e: ReactMouseEvent) {
+    e.preventDefault();
+    const el = logRef.current;
+    if (!el) return;
+    const bottom = el.getBoundingClientRect().bottom;
+    const onMove = (ev: MouseEvent) => {
+      const h = Math.min(
+        Math.max(bottom - ev.clientY, 140),
+        window.innerHeight - 200
+      );
+      setLogHeight(h);
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.userSelect = "";
+    };
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
 
   // Wrapper de invoke que registra cada comando en el panel de comandos.
   async function call<T>(
@@ -243,6 +310,32 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logTab, selectedId]);
 
+  useEffect(() => {
+    localStorage.setItem("logHeight", String(logHeight));
+  }, [logHeight]);
+
+  // Drag & drop de ficheros locales sobre el explorador → subir.
+  useEffect(() => {
+    const un = getCurrentWindow().onDragDropEvent((ev) => {
+      const p = ev.payload;
+      if (logTabRef.current !== "explorer") {
+        setDragOver(false);
+        return;
+      }
+      if (p.type === "drop") {
+        setDragOver(false);
+        uploadDroppedRef.current(p.paths);
+      } else if (p.type === "leave") {
+        setDragOver(false);
+      } else {
+        setDragOver(true); // enter / over
+      }
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, []);
+
   function update(patch: Partial<Profile>) {
     if (!selected) return;
     setProfiles((prev) =>
@@ -335,12 +428,37 @@ function App() {
     setStatus(t("action.testing"));
     setTesting(true);
     try {
-      const msg = await call<string>("test_connection", { profile: selected });
-      setStatus(`✓ ${msg}`);
+      const res = await call<{
+        status: "ok" | "hostKey";
+        message?: string;
+        fingerprint?: string;
+        changed?: boolean;
+      }>("test_connection", { profile: selected });
+      if (res.status === "ok") {
+        setStatus(`✓ ${res.message}`);
+      } else {
+        setHostKeyPrompt({
+          fingerprint: res.fingerprint ?? "",
+          changed: !!res.changed,
+        });
+        setStatus("");
+      }
     } catch (e) {
       setStatus(`✗ ${e}`);
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function trustHostKey() {
+    if (!selected) return;
+    setHostKeyPrompt(null);
+    try {
+      await call("trust_host_key", { profile: selected });
+      setStatus(t("hostkey.trusted"));
+      testConnection(); // reintenta: ahora la clave ya está confiada
+    } catch (e) {
+      setStatus(`✗ ${e}`);
     }
   }
 
@@ -388,6 +506,8 @@ function App() {
     if (!selected) return;
     setExplorerLoadedId(selected.id);
     setExplorerPath(path);
+    setExplorerSel(new Set());
+    setCtxMenu(null);
     setExplorerLoading(true);
     setExplorerError("");
     try {
@@ -415,9 +535,93 @@ function App() {
   }
 
   function explorerEnter(name: string) {
-    const base = (explorerPath || "/").replace(/\/+$/, "");
-    loadExplorer(base === "" ? `/${name}` : `${base}/${name}`);
+    loadExplorer(joinRemote(name));
   }
+
+  function joinRemote(name: string) {
+    const base = (explorerPath || "/").replace(/\/+$/, "");
+    return base === "" ? `/${name}` : `${base}/${name}`;
+  }
+
+  function explorerClick(e: ReactMouseEvent, name: string) {
+    setExplorerSel((prev) => {
+      const next = new Set(prev);
+      if (e.metaKey || e.ctrlKey) {
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+      } else {
+        next.clear();
+        next.add(name);
+      }
+      return next;
+    });
+  }
+
+  function openCtxMenu(e: ReactMouseEvent, name: string) {
+    e.preventDefault();
+    setExplorerSel((prev) => (prev.has(name) ? prev : new Set([name])));
+    setCtxMenu({ x: e.clientX, y: e.clientY });
+  }
+
+  function startRename() {
+    const names = [...explorerSel];
+    setCtxMenu(null);
+    if (names.length !== 1) return;
+    setRenameName(names[0]);
+    setRenameValue(names[0]);
+  }
+
+  async function confirmRename() {
+    const orig = renameName;
+    const val = renameValue.trim();
+    setRenameName(null);
+    if (!selected || !orig || val === "" || val === orig) return;
+    try {
+      await call("rename_remote", {
+        profile: selected,
+        from: joinRemote(orig),
+        to: joinRemote(val),
+      });
+      loadExplorer(explorerPath);
+    } catch (e) {
+      setStatus(`✗ ${e}`);
+    }
+  }
+
+  function askDelete() {
+    setCtxMenu(null);
+    if (explorerSel.size > 0) setConfirmDelete(true);
+  }
+
+  async function confirmDeleteNow() {
+    setConfirmDelete(false);
+    if (!selected || explorerSel.size === 0) return;
+    const paths = [...explorerSel].map(joinRemote);
+    try {
+      await call("delete_remote", { profile: selected, paths });
+      loadExplorer(explorerPath);
+    } catch (e) {
+      setStatus(`✗ ${e}`);
+    }
+  }
+
+  async function doUpload(paths: string[]) {
+    const prof = selectedProfileRef.current;
+    const dir = explorerPathRef.current;
+    if (!prof || !dir || paths.length === 0) return;
+    try {
+      const n = await call<number>("upload_files", {
+        profile: prof,
+        localPaths: paths,
+        remoteDir: dir,
+      });
+      setStatus(t("explorer.uploaded", { n }));
+      loadExplorerRef.current(dir);
+    } catch (e) {
+      setStatus(`✗ ${e}`);
+    }
+  }
+  uploadDroppedRef.current = doUpload;
 
   async function toggleWatch() {
     if (!selected) return;
@@ -544,7 +748,10 @@ function App() {
           <div ref={cmdEndRef} />
         </div>
       ) : (
-        <div className="log-body explorer">
+        <div className={`log-body explorer ${dragOver ? "dragover" : ""}`}>
+          {dragOver && (
+            <div className="drop-overlay">{t("explorer.dropHint")}</div>
+          )}
           <div className="explorer-bar">
             <button
               className="explorer-up"
@@ -574,8 +781,12 @@ function App() {
               {explorerEntries.map((e) => (
                 <div
                   key={e.name}
-                  className={`explorer-row ${e.isDir ? "dir" : ""}`}
-                  onClick={() => e.isDir && explorerEnter(e.name)}
+                  className={`explorer-row ${e.isDir ? "dir" : ""} ${
+                    explorerSel.has(e.name) ? "sel" : ""
+                  }`}
+                  onClick={(ev) => explorerClick(ev, e.name)}
+                  onDoubleClick={() => e.isDir && explorerEnter(e.name)}
+                  onContextMenu={(ev) => openCtxMenu(ev, e.name)}
                   title={e.isDir ? t("explorer.openFolder") : e.name}
                 >
                   <span className="ex-icon">{e.isDir ? "📁" : "📄"}</span>
@@ -660,7 +871,7 @@ function App() {
               <line x1="10" y1="1" x2="10" y2="4" />
               <line x1="14" y1="1" x2="14" y2="4" />
             </svg>
-            Buy me a coffee
+            {t("bmc.label")}
           </button>
         </div>
       </aside>
@@ -696,14 +907,29 @@ function App() {
                       onChange={(e) => update({ name: e.target.value })}
                     />
                   </div>
+                  <div className="edit-tabs">
+                    {(
+                      [
+                        ["connection", t("section.connection")],
+                        ["sync", t("section.sync")],
+                        ["notifications", t("section.notifications")],
+                      ] as ["connection" | "sync" | "notifications", string][]
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        className={`etab ${editTab === id ? "on" : ""}`}
+                        onClick={() => setEditTab(id)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="edit-body">
                   <fieldset className="fields" disabled={testing || syncing}>
+                    {editTab === "connection" && (
                     <section className="section">
-                      <h3 className="section-title">
-                        {t("section.connection")}
-                      </h3>
                       <div className="grid2">
                         <div className="form-row grow">
                           <label>{t("field.host")}</label>
@@ -834,9 +1060,10 @@ function App() {
                         </div>
                       </div>
                     </section>
+                    )}
 
+                    {editTab === "sync" && (
                     <section className="section">
-                      <h3 className="section-title">{t("section.sync")}</h3>
 
                       <div className="form-row">
                         <label>{t("field.include")}</label>
@@ -914,11 +1141,10 @@ function App() {
                         </label>
                       </div>
                     </section>
+                    )}
 
+                    {editTab === "notifications" && (
                     <section className="section">
-                      <h3 className="section-title">
-                        {t("section.notifications")}
-                      </h3>
                       <div className="radios">
                         {(
                           [
@@ -940,6 +1166,7 @@ function App() {
                         ))}
                       </div>
                     </section>
+                    )}
                   </fieldset>
                 </div>
 
@@ -961,13 +1188,21 @@ function App() {
                   ) : (
                     <>
                       <button onClick={save}>{t("action.save")}</button>
-                      <button onClick={testConnection}>{t("action.test")}</button>
-                      <button onClick={syncNow}>{t("action.syncNow")}</button>
+                      <button
+                        onClick={testConnection}
+                        disabled={!canConnect}
+                      >
+                        {t("action.test")}
+                      </button>
+                      <button onClick={syncNow} disabled={!canSync}>
+                        {t("action.syncNow")}
+                      </button>
                       <button
                         className={
                           watching.has(selected.id) ? "danger" : "primary"
                         }
                         onClick={toggleWatch}
+                        disabled={!watching.has(selected.id) && !canSync}
                       >
                         {watching.has(selected.id)
                           ? t("watch.stop")
@@ -984,7 +1219,14 @@ function App() {
                 </div>
               </div>
 
-              <div className="log">{logInner}</div>
+              <div className="log" ref={logRef} style={{ height: logHeight }}>
+                <div
+                  className="resize-handle"
+                  onMouseDown={startResize}
+                  title={t("resize.hint")}
+                />
+                {logInner}
+              </div>
             </>
           )
         ) : (
@@ -998,7 +1240,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="about-title">SFTP Sync</h2>
-            <p className="about-version">v0.2.0</p>
+            <p className="about-version">v0.3.0</p>
             <div className="about-author">
               <div className="about-name">Marcos Esperón</div>
               <button
@@ -1105,6 +1347,20 @@ function App() {
             </div>
 
             <div className="settings-section">
+              <h3 className="settings-h">{t("settings.security")}</h3>
+              <label className="settings-check">
+                <input
+                  type="checkbox"
+                  checked={settings.verifyHostKey}
+                  onChange={(e) =>
+                    saveSettings({ verifyHostKey: e.target.checked })
+                  }
+                />
+                {t("settings.verifyHostKey")}
+              </label>
+            </div>
+
+            <div className="settings-section">
               <h3 className="settings-h">{t("settings.profilesSection")}</h3>
               <div className="settings-btns">
                 <button onClick={exportConfig}>{t("settings.export")}</button>
@@ -1119,6 +1375,116 @@ function App() {
             >
               {t("about.close")}
             </button>
+          </div>
+        </div>
+      )}
+
+      {hostKeyPrompt && (
+        <div className="modal-overlay" onClick={() => setHostKeyPrompt(null)}>
+          <div
+            className={`modal hostkey-modal ${
+              hostKeyPrompt.changed ? "danger-modal" : ""
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="about-title">{t("hostkey.title")}</h2>
+            <p className="hostkey-msg">
+              {hostKeyPrompt.changed
+                ? t("hostkey.changed")
+                : t("hostkey.unknown")}
+            </p>
+            <code className="hostkey-fp">{hostKeyPrompt.fingerprint}</code>
+            <div className="hostkey-actions">
+              <button
+                className="about-close"
+                onClick={() => setHostKeyPrompt(null)}
+              >
+                {t("hostkey.cancel")}
+              </button>
+              <button
+                className={hostKeyPrompt.changed ? "danger" : "primary"}
+                onClick={trustHostKey}
+              >
+                {hostKeyPrompt.changed
+                  ? t("hostkey.trustChanged")
+                  : t("hostkey.trust")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ctxMenu && (
+        <>
+          <div
+            className="ctx-backdrop"
+            onClick={() => setCtxMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setCtxMenu(null);
+            }}
+          />
+          <div
+            className="ctx-menu"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          >
+            <button disabled={explorerSel.size !== 1} onClick={startRename}>
+              {t("explorer.rename")}
+            </button>
+            <button className="danger-item" onClick={askDelete}>
+              {t("explorer.delete")} ({explorerSel.size})
+            </button>
+          </div>
+        </>
+      )}
+
+      {renameName && (
+        <div className="modal-overlay" onClick={() => setRenameName(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="about-title">{t("explorer.renameTitle")}</h2>
+            <input
+              className="rename-input"
+              value={renameValue}
+              autoFocus
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmRename();
+                if (e.key === "Escape") setRenameName(null);
+              }}
+            />
+            <div className="hostkey-actions">
+              <button className="about-close" onClick={() => setRenameName(null)}>
+                {t("common.cancel")}
+              </button>
+              <button className="primary" onClick={confirmRename}>
+                {t("common.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={() => setConfirmDelete(false)}>
+          <div
+            className="modal danger-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="about-title">{t("explorer.delete")}</h2>
+            <p className="hostkey-msg">
+              {t("explorer.deleteConfirm", { n: explorerSel.size })}
+            </p>
+            <div className="hostkey-actions">
+              <button
+                className="about-close"
+                onClick={() => setConfirmDelete(false)}
+              >
+                {t("common.cancel")}
+              </button>
+              <button className="danger" onClick={confirmDeleteNow}>
+                {t("common.delete")}
+              </button>
+            </div>
           </div>
         </div>
       )}

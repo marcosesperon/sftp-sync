@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tauri::AppHandle;
 
+use crate::commands;
 use crate::config::{NotifyMode, Profile};
 use crate::events;
 use crate::ignore;
@@ -128,7 +129,7 @@ pub async fn run(app: AppHandle, profile: Profile) {
 
             // Garantiza una conexión viva antes de operar.
             if conn.is_none() {
-                match SftpConnection::connect(&profile).await {
+                match SftpConnection::connect(&profile, commands::host_key_mode(&app)).await {
                     Ok(c) => conn = Some(c),
                     Err(e) => {
                         events::log(&app, &profile.id, "error", format!("conexión: {e}"));

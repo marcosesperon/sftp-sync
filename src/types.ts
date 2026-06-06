@@ -35,6 +35,7 @@ export interface Settings {
   showTray: boolean;
   autostartWatchers: boolean;
   launchAtLogin: boolean;
+  verifyHostKey: boolean;
 }
 
 export interface SyncStats {

@@ -19,6 +19,8 @@ pub struct Settings {
     pub autostart_watchers: bool,
     /// Abrir la app al iniciar el ordenador.
     pub launch_at_login: bool,
+    /// Verificar la clave del servidor contra known_hosts (TOFU).
+    pub verify_host_key: bool,
 }
 
 impl Default for Settings {
@@ -30,6 +32,7 @@ impl Default for Settings {
             show_tray: true,
             autostart_watchers: false,
             launch_at_login: false,
+            verify_host_key: true,
         }
     }
 }

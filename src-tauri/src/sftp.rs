@@ -7,26 +7,77 @@ use anyhow::{anyhow, Context, Result};
 use russh::client::{self, AuthResult, Handle};
 use russh::keys::{load_secret_key, HashAlg, PrivateKeyWithHashAlg};
 use russh_sftp::client::SftpSession;
-use std::sync::Arc;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use tokio::io::AsyncWriteExt;
 
 use crate::config::{Auth, Profile};
 
-/// Handler de cliente SSH. Para el MVP aceptamos cualquier clave de servidor.
-///
-/// NOTA DE SEGURIDAD: esto omite la verificación del host key (equivalente a
-/// `StrictHostKeyChecking no`). Es aceptable para una herramienta de despliegue
-/// en red controlada, pero debería sustituirse por un known_hosts real.
-struct ClientHandler;
+/// Política de verificación de la clave del servidor (host key).
+#[derive(Clone)]
+pub enum HostKeyMode {
+    /// Acepta cualquier clave (sin verificación). Equivale a `StrictHostKeyChecking no`.
+    AcceptAll,
+    /// Verifica la clave contra el fichero `known_hosts` indicado.
+    Verify(PathBuf),
+    /// Aprende (guarda) la clave en `known_hosts` y la acepta.
+    Learn(PathBuf),
+}
+
+/// Error de conexión, distinguiendo los problemas de host key para la UI.
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectError {
+    #[error("clave de servidor desconocida ({0}); prueba la conexión para confiarla")]
+    HostKeyUnknown(String),
+    #[error("la clave del servidor ha CAMBIADO ({0}); posible suplantación")]
+    HostKeyChanged(String),
+    #[error("{0}")]
+    Other(String),
+}
+
+fn is_key_changed(e: &russh::keys::Error) -> bool {
+    matches!(e, russh::keys::Error::KeyChanged { .. })
+}
+
+/// Handler de cliente SSH que verifica la clave del servidor según el modo.
+struct ClientHandler {
+    mode: HostKeyMode,
+    host: String,
+    port: u16,
+    /// Veredicto de la verificación; lo lee `connect` si el handshake falla.
+    verdict: Arc<Mutex<Option<ConnectError>>>,
+}
 
 impl client::Handler for ClientHandler {
     type Error = russh::Error;
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &russh::keys::ssh_key::PublicKey,
+        key: &russh::keys::ssh_key::PublicKey,
     ) -> Result<bool, Self::Error> {
-        Ok(true)
+        match &self.mode {
+            HostKeyMode::AcceptAll => Ok(true),
+            HostKeyMode::Learn(path) => {
+                let _ =
+                    russh::keys::known_hosts::learn_known_hosts_path(&self.host, self.port, key, path);
+                Ok(true)
+            }
+            HostKeyMode::Verify(path) => {
+                let fp = key.fingerprint(HashAlg::Sha256).to_string();
+                let verdict =
+                    match russh::keys::check_known_hosts_path(&self.host, self.port, key, path) {
+                        Ok(true) => return Ok(true), // conocida y coincide
+                        Ok(false) => ConnectError::HostKeyUnknown(fp),
+                        Err(e) if is_key_changed(&e) => ConnectError::HostKeyChanged(fp),
+                        // Fichero inexistente u otro error de lectura: tratar como desconocida.
+                        Err(_) => ConnectError::HostKeyUnknown(fp),
+                    };
+                if let Ok(mut g) = self.verdict.lock() {
+                    *g = Some(verdict);
+                }
+                Ok(false)
+            }
+        }
     }
 }
 
@@ -37,77 +88,119 @@ pub struct SftpConnection {
 }
 
 impl SftpConnection {
-    /// Abre una conexión SSH, autentica y arranca el subsistema SFTP.
-    pub async fn connect(profile: &Profile) -> Result<Self> {
+    /// Abre una conexión SSH (verificando la clave del servidor según `mode`),
+    /// autentica y arranca el subsistema SFTP.
+    pub async fn connect(
+        profile: &Profile,
+        mode: HostKeyMode,
+    ) -> std::result::Result<Self, ConnectError> {
+        let verdict: Arc<Mutex<Option<ConnectError>>> = Arc::new(Mutex::new(None));
         let config = Arc::new(client::Config::default());
-        let mut session = client::connect(config, (profile.host.as_str(), profile.port), ClientHandler)
-            .await
-            .with_context(|| format!("no se pudo conectar a {}:{}", profile.host, profile.port))?;
-
-        let auth: AuthResult = match &profile.auth {
-            Auth::Key {
-                private_key_path,
-                passphrase,
-            } => {
-                let key = load_secret_key(private_key_path, passphrase.as_deref())
-                    .with_context(|| format!("no se pudo cargar la clave {private_key_path}"))?;
-                let key = Arc::new(key);
-
-                // Para claves RSA, los servidores OpenSSH modernos rechazan la
-                // firma ssh-rsa (SHA-1) y exigen rsa-sha2-512/256. Probamos esas
-                // variantes antes de caer a SHA-1 (None). Para otros tipos de
-                // clave (ed25519, ecdsa) el algoritmo de hash es implícito (None).
-                let is_rsa = key.algorithm().as_str().starts_with("ssh-rsa");
-                let hash_algs: Vec<Option<HashAlg>> = if is_rsa {
-                    vec![Some(HashAlg::Sha512), Some(HashAlg::Sha256), None]
-                } else {
-                    vec![None]
-                };
-
-                let mut last = None;
-                for alg in hash_algs {
-                    let r = session
-                        .authenticate_publickey(
-                            &profile.username,
-                            PrivateKeyWithHashAlg::new(key.clone(), alg),
-                        )
-                        .await?;
-                    let ok = matches!(r, AuthResult::Success);
-                    last = Some(r);
-                    if ok {
-                        break;
-                    }
-                }
-                last.expect("al menos un intento de autenticación")
-            }
-            Auth::Password { password } => {
-                session
-                    .authenticate_password(&profile.username, password)
-                    .await?
-            }
+        let handler = ClientHandler {
+            mode,
+            host: profile.host.clone(),
+            port: profile.port,
+            verdict: verdict.clone(),
         };
 
-        match auth {
-            AuthResult::Success => {}
-            AuthResult::Failure {
-                remaining_methods, ..
-            } => {
-                return Err(anyhow!(
-                    "autenticación rechazada para '{}'. Métodos que acepta el servidor: {:?}",
-                    profile.username,
-                    remaining_methods
-                ));
+        let session =
+            match client::connect(config, (profile.host.as_str(), profile.port), handler).await {
+                Ok(s) => s,
+                Err(e) => {
+                    // Si el fallo fue por la verificación del host key, devolvemos
+                    // el veredicto tipado para que la UI pueda ofrecer confiar.
+                    if let Some(v) = verdict.lock().ok().and_then(|mut g| g.take()) {
+                        return Err(v);
+                    }
+                    return Err(ConnectError::Other(format!(
+                        "no se pudo conectar a {}:{}: {e}",
+                        profile.host, profile.port
+                    )));
+                }
+            };
+
+        // El resto (auth + subsistema SFTP) usa anyhow y se mapea a Other.
+        let built: Result<SftpConnection> = async {
+            let mut session = session;
+            let auth: AuthResult = match &profile.auth {
+                Auth::Key {
+                    private_key_path,
+                    passphrase,
+                } => {
+                    let key = load_secret_key(private_key_path, passphrase.as_deref())
+                        .with_context(|| format!("no se pudo cargar la clave {private_key_path}"))?;
+                    let key = Arc::new(key);
+                    // RSA: servidores OpenSSH modernos rechazan ssh-rsa (SHA-1);
+                    // probamos rsa-sha2-512/256 antes de caer a SHA-1.
+                    let is_rsa = key.algorithm().as_str().starts_with("ssh-rsa");
+                    let hash_algs: Vec<Option<HashAlg>> = if is_rsa {
+                        vec![Some(HashAlg::Sha512), Some(HashAlg::Sha256), None]
+                    } else {
+                        vec![None]
+                    };
+                    let mut last = None;
+                    for alg in hash_algs {
+                        let r = session
+                            .authenticate_publickey(
+                                &profile.username,
+                                PrivateKeyWithHashAlg::new(key.clone(), alg),
+                            )
+                            .await?;
+                        let ok = matches!(r, AuthResult::Success);
+                        last = Some(r);
+                        if ok {
+                            break;
+                        }
+                    }
+                    last.expect("al menos un intento de autenticación")
+                }
+                Auth::Password { password } => {
+                    session
+                        .authenticate_password(&profile.username, password)
+                        .await?
+                }
+            };
+
+            match auth {
+                AuthResult::Success => {}
+                AuthResult::Failure {
+                    remaining_methods, ..
+                } => {
+                    return Err(anyhow!(
+                        "autenticación rechazada para '{}'. Métodos que acepta el servidor: {:?}",
+                        profile.username,
+                        remaining_methods
+                    ));
+                }
             }
+
+            let channel = session.channel_open_session().await?;
+            channel.request_subsystem(true, "sftp").await?;
+            let sftp = SftpSession::new(channel.into_stream()).await?;
+            Ok(SftpConnection {
+                _session: session,
+                sftp,
+            })
         }
+        .await;
 
-        let channel = session.channel_open_session().await?;
-        channel.request_subsystem(true, "sftp").await?;
-        let sftp = SftpSession::new(channel.into_stream()).await?;
+        built.map_err(|e| ConnectError::Other(e.to_string()))
+    }
 
-        Ok(SftpConnection {
-            _session: session,
-            sftp,
-        })
+    /// Conecta solo para **aprender** y guardar la clave del servidor en `known_hosts`.
+    /// No autentica: la clave se captura durante el handshake.
+    pub async fn learn_host_key(profile: &Profile, path: PathBuf) -> Result<()> {
+        let config = Arc::new(client::Config::default());
+        let handler = ClientHandler {
+            mode: HostKeyMode::Learn(path),
+            host: profile.host.clone(),
+            port: profile.port,
+            verdict: Arc::new(Mutex::new(None)),
+        };
+        let _session = client::connect(config, (profile.host.as_str(), profile.port), handler)
+            .await
+            .with_context(|| format!("no se pudo conectar a {}:{}", profile.host, profile.port))?;
+        Ok(())
     }
 
     /// Sube `data` al `remote` indicado, creando los directorios intermedios.
@@ -140,6 +233,15 @@ impl SftpConnection {
     /// Crea un directorio remoto (incluyendo los intermedios).
     pub async fn ensure_dir(&self, remote: &str) -> Result<()> {
         self.mkdir_p(remote).await
+    }
+
+    /// Renombra/mueve un fichero o carpeta remoto.
+    pub async fn rename(&self, from: &str, to: &str) -> Result<()> {
+        self.sftp
+            .rename(from.to_string(), to.to_string())
+            .await
+            .with_context(|| format!("no se pudo renombrar {from} → {to}"))?;
+        Ok(())
     }
 
     /// Borra un fichero o, si resulta ser un directorio, todo su contenido.

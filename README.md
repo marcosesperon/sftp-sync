@@ -13,6 +13,7 @@ Sube ficheros automáticamente al guardar (watcher), respeta patrones `ignore`, 
 - Autenticación por **clave privada** (con *passphrase* opcional) o por **contraseña**.
 - **Compatibilidad RSA moderna**: para claves RSA prueba automáticamente `rsa-sha2-512` → `rsa-sha2-256` → `ssh-rsa`, evitando el típico rechazo de los servidores OpenSSH actuales que ya no aceptan firmas SHA‑1.
 - **Prueba de conexión** que autentica y lista la ruta remota; si falla, informa de **qué métodos de autenticación acepta el servidor**.
+- **Verificación de la clave del servidor** (host key) con modelo TOFU y `known_hosts` propio; ver [Notas de seguridad](#-notas-de-seguridad).
 
 ### Sincronización
 - **Subir al guardar (watcher):** vigila la carpeta local de forma recursiva y sube los cambios automáticamente. Usa *debounce* para agrupar la ráfaga de eventos que generan los editores al guardar (escritura temporal + renombrado).
@@ -44,7 +45,7 @@ Sube ficheros automáticamente al guardar (watcher), respeta patrones `ignore`, 
 - **Icono en la bandeja del sistema:** al cerrar la ventana, la app **se minimiza a la bandeja y sigue vigilando en segundo plano**. Desde la bandeja: mostrar la ventana o salir; el tooltip indica cuántos perfiles están activos. Clic en el icono (o en el Dock en macOS) reabre la ventana. **Instancia única** (un segundo arranque enfoca la ventana existente).
 - **Tema claro/oscuro** automático según el sistema operativo (o forzado desde ajustes).
 - **Multiidioma** (español / inglés), por defecto el del sistema.
-- **Pantalla de ajustes** con: idioma, tema, mostrar/ocultar en Dock (macOS) y bandeja, iniciar watchers al abrir la app (perfiles con "Subir al guardar"), abrir al iniciar el ordenador, e **importar/exportar** la configuración de perfiles.
+- **Pantalla de ajustes** con: idioma, tema, mostrar/ocultar en Dock (macOS) y bandeja, iniciar watchers al abrir la app (perfiles con "Subir al guardar"), abrir al iniciar el ordenador, **verificación de la clave del servidor** (known_hosts) e **importar/exportar** la configuración de perfiles.
 
 ---
 
@@ -184,12 +185,18 @@ Normalmente no hace falta editarlo a mano (todo se gestiona desde la UI), pero e
 
 ## 🔒 Notas de seguridad
 
-Este proyecto es un **MVP funcional**. Ten en cuenta:
+- **Las credenciales se guardan en claro** en `profiles.json` (en el directorio de configuración de la app). No lo subas a ningún repositorio. (Pendiente: moverlas al keychain del SO.)
 
-- **Las credenciales se guardan en claro** en `profiles.json`. No lo subas a ningún repositorio.
-- **No se verifica el host key** del servidor (equivalente a `StrictHostKeyChecking no`). Aceptable en una red controlada, pero conviene endurecerlo.
+### Verificación de la clave del servidor (host key)
 
-Ambos puntos están en la hoja de ruta.
+Para mitigar ataques *man-in-the-middle*, la app verifica la clave del servidor SSH con un modelo **TOFU** (*Trust On First Use*), al estilo de OpenSSH:
+
+- Las claves confiadas se guardan en un fichero **`known_hosts` propio** de la app (en su directorio de configuración), **sin tocar** tu `~/.ssh/known_hosts`.
+- **Primera vez que conectas a un host:** al pulsar *Probar conexión*, si la clave es desconocida, la app muestra su **huella SHA256** y pide confirmación antes de confiarla. Si aceptas, se guarda y las conexiones posteriores (sincronización, watcher, explorador) funcionan sin más.
+- **Si la clave cambia** respecto a la guardada, se muestra una **alerta destacada** (posible suplantación) y hay que confirmar explícitamente para continuar.
+- Se puede **desactivar** en *Ajustes → Seguridad* ("Verificar la clave del servidor"), volviendo a aceptar cualquier clave (no recomendado).
+
+**Cómo está implementado:** la verificación ocurre durante el handshake SSH (`check_server_key`), que es síncrono y no puede abrir un diálogo. Por eso, cuando la clave no es de confianza, la conexión se **rechaza** devolviendo un error tipado con la huella; la UI muestra el diálogo de confirmación y, al aceptar, el comando `trust_host_key` guarda la clave en `known_hosts` (`learn_known_hosts_path`) y se **reintenta** la conexión. El punto natural para establecer la confianza es *Probar conexión*; una vez confiada, el resto de operaciones conectan sin fricción.
 
 ---
 
@@ -224,7 +231,6 @@ src-tauri/src/
 
 ## 🗺️ Hoja de ruta
 
-- [ ] Verificación de host key (known_hosts).
 - [ ] Credenciales en el keychain del SO ([`keyring`](https://crates.io/crates/keyring)).
 - [ ] Soporte **FTP/FTPS** ([`suppaftp`](https://crates.io/crates/suppaftp)).
 

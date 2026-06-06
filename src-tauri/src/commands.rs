@@ -9,7 +9,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::config::{Config, Profile};
 use crate::events;
 use crate::settings::Settings;
-use crate::sftp::SftpConnection;
+use crate::sftp::{ConnectError, HostKeyMode, SftpConnection};
 use crate::sync::{self, SyncStats};
 use crate::watcher;
 
@@ -42,6 +42,35 @@ pub(crate) fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join("settings.json"))
 }
 
+/// Ruta del store de claves de servidor (`app_config_dir/known_hosts`).
+fn known_hosts_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("no se pudo resolver el directorio de configuración: {e}"))?;
+    if !dir.exists() {
+        let _ = std::fs::create_dir_all(&dir);
+    }
+    Ok(dir.join("known_hosts"))
+}
+
+/// Modo de verificación de host key según los ajustes.
+pub(crate) fn host_key_mode(app: &AppHandle) -> HostKeyMode {
+    let verify = settings_path(app)
+        .ok()
+        .and_then(|p| Settings::load(&p).ok())
+        .map(|s| s.verify_host_key)
+        .unwrap_or(true);
+    if verify {
+        match known_hosts_path(app) {
+            Ok(p) => HostKeyMode::Verify(p),
+            Err(_) => HostKeyMode::AcceptAll,
+        }
+    } else {
+        HostKeyMode::AcceptAll
+    }
+}
+
 #[tauri::command]
 pub fn load_config(app: AppHandle) -> Result<Config, String> {
     let path = config_path(&app)?;
@@ -61,9 +90,11 @@ pub fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
 /// verdad el intento en curso (no solo descarta el resultado).
 #[tauri::command]
 pub async fn test_connection(
+    app: AppHandle,
     state: State<'_, AppState>,
     profile: Profile,
-) -> Result<String, String> {
+) -> Result<TestResult, String> {
+    let mode = host_key_mode(&app);
     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
     {
         let mut cancels = state.test_cancels.lock().map_err(|e| e.to_string())?;
@@ -72,7 +103,7 @@ pub async fn test_connection(
     }
 
     let result = tokio::select! {
-        res = do_test(&profile) => res.map_err(|e| e.to_string()),
+        res = do_test(&profile, mode) => res,
         _ = rx => Err("Prueba de conexión cancelada".to_string()),
     };
 
@@ -80,6 +111,15 @@ pub async fn test_connection(
         cancels.remove(&profile.id);
     }
     result
+}
+
+/// Resultado de una prueba de conexión: éxito, o que la clave del servidor
+/// requiere confirmación del usuario (TOFU).
+#[derive(serde::Serialize)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum TestResult {
+    Ok { message: String },
+    HostKey { fingerprint: String, changed: bool },
 }
 
 /// Cancela una prueba de conexión en curso para el perfil indicado.
@@ -107,8 +147,12 @@ pub struct RemoteEntry {
 
 /// Lista un directorio remoto para el explorador de la UI.
 #[tauri::command]
-pub async fn list_remote_dir(profile: Profile, path: String) -> Result<Vec<RemoteEntry>, String> {
-    let conn = SftpConnection::connect(&profile)
+pub async fn list_remote_dir(
+    app: AppHandle,
+    profile: Profile,
+    path: String,
+) -> Result<Vec<RemoteEntry>, String> {
+    let conn = SftpConnection::connect(&profile, host_key_mode(&app))
         .await
         .map_err(|e| e.to_string())?;
     let entries = conn
@@ -127,14 +171,102 @@ pub async fn list_remote_dir(profile: Profile, path: String) -> Result<Vec<Remot
         .collect())
 }
 
-async fn do_test(profile: &Profile) -> anyhow::Result<String> {
-    let conn = SftpConnection::connect(profile).await?;
-    let entries = conn.list_dir(&profile.remote_path).await?;
-    Ok(format!(
-        "Conexión correcta. {} entradas en {}",
-        entries.len(),
-        profile.remote_path
-    ))
+async fn do_test(profile: &Profile, mode: HostKeyMode) -> Result<TestResult, String> {
+    match SftpConnection::connect(profile, mode).await {
+        Ok(conn) => {
+            let entries = conn
+                .list_dir(&profile.remote_path)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(TestResult::Ok {
+                message: format!(
+                    "Conexión correcta. {} entradas en {}",
+                    entries.len(),
+                    profile.remote_path
+                ),
+            })
+        }
+        Err(ConnectError::HostKeyUnknown(fp)) => Ok(TestResult::HostKey {
+            fingerprint: fp,
+            changed: false,
+        }),
+        Err(ConnectError::HostKeyChanged(fp)) => Ok(TestResult::HostKey {
+            fingerprint: fp,
+            changed: true,
+        }),
+        Err(ConnectError::Other(e)) => Err(e),
+    }
+}
+
+/// Confía y guarda la clave del servidor del perfil en `known_hosts`.
+#[tauri::command]
+pub async fn trust_host_key(app: AppHandle, profile: Profile) -> Result<(), String> {
+    let path = known_hosts_path(&app)?;
+    SftpConnection::learn_host_key(&profile, path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Borra del remoto las rutas indicadas (ficheros o carpetas recursivamente).
+#[tauri::command]
+pub async fn delete_remote(
+    app: AppHandle,
+    profile: Profile,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    let conn = SftpConnection::connect(&profile, host_key_mode(&app))
+        .await
+        .map_err(|e| e.to_string())?;
+    for p in &paths {
+        conn.remove_any(p).await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Renombra/mueve un elemento remoto.
+#[tauri::command]
+pub async fn rename_remote(
+    app: AppHandle,
+    profile: Profile,
+    from: String,
+    to: String,
+) -> Result<(), String> {
+    let conn = SftpConnection::connect(&profile, host_key_mode(&app))
+        .await
+        .map_err(|e| e.to_string())?;
+    conn.rename(&from, &to).await.map_err(|e| e.to_string())
+}
+
+/// Sube ficheros locales (arrastrados) a un directorio remoto. Devuelve cuántos subió.
+#[tauri::command]
+pub async fn upload_files(
+    app: AppHandle,
+    profile: Profile,
+    local_paths: Vec<String>,
+    remote_dir: String,
+) -> Result<usize, String> {
+    let conn = SftpConnection::connect(&profile, host_key_mode(&app))
+        .await
+        .map_err(|e| e.to_string())?;
+    let base = remote_dir.trim_end_matches('/');
+    let mut n = 0;
+    for lp in &local_paths {
+        let path = std::path::Path::new(lp);
+        // Solo ficheros (las carpetas arrastradas se omiten en esta versión).
+        if !path.is_file() {
+            continue;
+        }
+        let name = match path.file_name().and_then(|s| s.to_str()) {
+            Some(name) => name,
+            None => continue,
+        };
+        let data = std::fs::read(path).map_err(|e| e.to_string())?;
+        conn.upload(&format!("{base}/{name}"), &data)
+            .await
+            .map_err(|e| e.to_string())?;
+        n += 1;
+    }
+    Ok(n)
 }
 
 /// Sincronización completa (sube todo lo no ignorado). Es **cancelable**: al
@@ -179,7 +311,9 @@ pub fn cancel_sync(state: State<AppState>, profile_id: String) -> Result<(), Str
 }
 
 async fn run_sync(app: &AppHandle, profile: &Profile) -> anyhow::Result<SyncStats> {
-    let conn = SftpConnection::connect(profile).await?;
+    let conn = SftpConnection::connect(profile, host_key_mode(app))
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let pid = profile.id.clone();
     let app2 = app.clone();
     let stats = sync::sync_all(&conn, profile, |msg| {
@@ -210,13 +344,39 @@ async fn run_sync(app: &AppHandle, profile: &Profile) -> anyhow::Result<SyncStat
 
 #[tauri::command]
 pub fn start_watch(app: AppHandle, state: State<AppState>, profile: Profile) -> Result<(), String> {
+    // Validación temprana: si la raíz local no es una carpeta, devolvemos error
+    // (la UI lo muestra) en vez de lanzar un watcher que moriría en silencio.
+    if profile.local_root.trim().is_empty()
+        || !std::path::Path::new(&profile.local_root).is_dir()
+    {
+        return Err(format!(
+            "la raíz local no existe o no es una carpeta: {}",
+            profile.local_root
+        ));
+    }
+
     let count = {
         let mut watchers = state.watchers.lock().map_err(|e| e.to_string())?;
         if watchers.contains_key(&profile.id) {
             return Ok(()); // ya está vigilando
         }
-        let handle = tauri::async_runtime::spawn(watcher::run(app.clone(), profile.clone()));
-        watchers.insert(profile.id, handle);
+        let key = profile.id.clone();
+        let id = profile.id.clone();
+        let app2 = app.clone();
+        let handle = tauri::async_runtime::spawn(async move {
+            watcher::run(app2.clone(), profile).await;
+            // Si el watcher termina por sí mismo (no por "Detener"), libera su
+            // entrada para poder reintentar sin reiniciar la app.
+            let mut n = 0;
+            if let Some(state) = app2.try_state::<AppState>() {
+                if let Ok(mut w) = state.watchers.lock() {
+                    w.remove(&id);
+                    n = w.len();
+                }
+            }
+            update_tray(&app2, n);
+        });
+        watchers.insert(key, handle);
         watchers.len()
     };
     update_tray(&app, count);
