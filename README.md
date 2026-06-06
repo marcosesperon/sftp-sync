@@ -137,7 +137,7 @@ Linux no tiene un *gatekeeper* equivalente, pero según el formato:
   sudo rpm -i sftp-sync-*.rpm
   ```
 
-> **Solución definitiva:** firmar y notarizar la app (Apple Developer ID en macOS, certificado de *code signing* en Windows) elimina estos avisos. Está en la hoja de ruta y requiere certificados de pago.
+> **Nota:** firmar y notarizar la app (Apple Developer ID en macOS, certificado de *code signing* en Windows) eliminaría estos avisos, pero requiere **certificados de pago**. Al tratarse de una aplicación **gratuita**, no se puede asumir ese coste, así que los binarios se distribuyen sin firmar.
 
 ---
 
@@ -227,10 +227,6 @@ src-tauri/src/
 - [ ] Verificación de host key (known_hosts).
 - [ ] Credenciales en el keychain del SO ([`keyring`](https://crates.io/crates/keyring)).
 - [ ] Soporte **FTP/FTPS** ([`suppaftp`](https://crates.io/crates/suppaftp)).
-- [x] Explorador de ficheros remoto en la UI.
-- [x] Icono en la bandeja del sistema (seguir vigilando con la ventana cerrada).
-- [ ] Importar configuración desde un fichero `sftp.json` existente.
-- [ ] Firma y notarización de los binarios (Apple Developer ID / Windows code signing).
 
 ---
 
@@ -252,4 +248,4 @@ Si esta herramienta te resulta útil, puedes invitarme a un café:
 
 ## 📄 Licencia
 
-Pendiente de definir. Se recomienda [MIT](https://choosealicense.com/licenses/mit/) si se publica como código abierto.
+Distribuido bajo licencia **MIT**. Consulta el fichero [LICENSE](LICENSE) para más detalles.
