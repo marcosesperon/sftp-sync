@@ -73,6 +73,17 @@ jobs:
       - name: Instalar dependencias del frontend
         run: pnpm install
 
+      - name: Extraer notas del CHANGELOG
+        id: changelog
+        shell: bash
+        run: |
+          {
+            echo 'body<<CHANGELOG_EOF'
+            node scripts/changelog.mjs "${GITHUB_REF_NAME#v}"
+            echo ''
+            echo CHANGELOG_EOF
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build y publicación del release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -80,7 +91,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "SFTP Sync ${{ github.ref_name }}"
-          releaseBody: "Binarios generados automáticamente. Ver los archivos adjuntos."
+          releaseBody: ${{ steps.changelog.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
