@@ -23,6 +23,21 @@ pub enum Auth {
     },
 }
 
+/// Modo de notificaciones nativas del sistema para un perfil.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NotifyMode {
+    /// Sin notificaciones.
+    #[default]
+    Off,
+    /// Solo cuando falla una operación.
+    Errors,
+    /// Una notificación de resumen por lote / sincronización.
+    Summary,
+    /// Una notificación por acción (con tope anti-spam).
+    All,
+}
+
 /// Un perfil de sincronización = un destino remoto + sus reglas.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +58,9 @@ pub struct Profile {
     /// Patrones a ignorar (estilo glob, como el array `ignore`).
     #[serde(default)]
     pub ignore: Vec<String>,
+    /// Patrones de inclusión: qué ficheros sincronizar. Vacío o `**/*` = todo.
+    #[serde(default)]
+    pub include: Vec<String>,
     /// Subir automáticamente al detectar cambios (uploadOnSave / watcher.autoUpload).
     #[serde(default)]
     pub upload_on_save: bool,
@@ -56,6 +74,9 @@ pub struct Profile {
     /// que ya no existen en local (o que están ignorados).
     #[serde(default)]
     pub mirror_delete: bool,
+    /// Modo de notificaciones nativas del sistema.
+    #[serde(default)]
+    pub notify: NotifyMode,
 }
 
 fn default_port() -> u16 {

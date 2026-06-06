@@ -4,6 +4,8 @@ export type Auth =
   | { type: "key"; privateKeyPath: string; passphrase?: string }
   | { type: "password"; password: string };
 
+export type NotifyMode = "off" | "errors" | "summary" | "all";
+
 export interface Profile {
   id: string;
   name: string;
@@ -14,14 +16,25 @@ export interface Profile {
   localRoot: string;
   remotePath: string;
   ignore: string[];
+  include: string[];
   uploadOnSave: boolean;
   autoDelete: boolean;
   syncEmptyDirs: boolean;
   mirrorDelete: boolean;
+  notify: NotifyMode;
 }
 
 export interface Config {
   profiles: Profile[];
+}
+
+export interface Settings {
+  language: "es" | "en" | null;
+  theme: "system" | "light" | "dark";
+  showInDock: boolean;
+  showTray: boolean;
+  autostartWatchers: boolean;
+  launchAtLogin: boolean;
 }
 
 export interface SyncStats {
@@ -40,6 +53,15 @@ export interface LogEntry {
 export interface WatchState {
   profileId: string;
   watching: boolean;
+}
+
+/// Entrada del explorador de ficheros remoto.
+export interface RemoteEntry {
+  name: string;
+  isDir: boolean;
+  size: number;
+  mtime: number | null;
+  perms: string;
 }
 
 /// Entrada del panel de log de comandos (cada invoke al backend).
@@ -63,9 +85,11 @@ export function newProfile(): Profile {
     localRoot: "",
     remotePath: "/var/www/",
     ignore: [".vscode", ".git", ".DS_Store", ".github/**", ".ci"],
+    include: ["**/*"],
     uploadOnSave: true,
     autoDelete: false,
     syncEmptyDirs: false,
     mirrorDelete: false,
+    notify: "errors",
   };
 }

@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::config::{Config, Profile};
 use crate::events;
+use crate::settings::Settings;
 use crate::sftp::SftpConnection;
 use crate::sync::{self, SyncStats};
 use crate::watcher;
@@ -24,12 +25,21 @@ pub struct AppState {
 }
 
 /// Ruta del fichero de configuración (`app_config_dir/profiles.json`).
-fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_config_dir()
         .map_err(|e| format!("no se pudo resolver el directorio de configuración: {e}"))?;
     Ok(dir.join("profiles.json"))
+}
+
+/// Ruta del fichero de ajustes (`app_config_dir/settings.json`).
+pub(crate) fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("no se pudo resolver el directorio de configuración: {e}"))?;
+    Ok(dir.join("settings.json"))
 }
 
 #[tauri::command]
@@ -80,6 +90,41 @@ pub fn cancel_test(state: State<AppState>, profile_id: String) -> Result<(), Str
         let _ = tx.send(()); // dispara la rama de cancelación del select!
     }
     Ok(())
+}
+
+/// Una entrada del explorador de ficheros remoto.
+#[derive(serde::Serialize)]
+pub struct RemoteEntry {
+    pub name: String,
+    #[serde(rename = "isDir")]
+    pub is_dir: bool,
+    pub size: u64,
+    /// Fecha de modificación (segundos Unix), si el servidor la informa.
+    pub mtime: Option<i64>,
+    /// Permisos estilo `drwxr-xr-x`.
+    pub perms: String,
+}
+
+/// Lista un directorio remoto para el explorador de la UI.
+#[tauri::command]
+pub async fn list_remote_dir(profile: Profile, path: String) -> Result<Vec<RemoteEntry>, String> {
+    let conn = SftpConnection::connect(&profile)
+        .await
+        .map_err(|e| e.to_string())?;
+    let entries = conn
+        .list_dir_entries(&path)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(entries
+        .into_iter()
+        .map(|(name, is_dir, size, mtime, perms)| RemoteEntry {
+            name,
+            is_dir,
+            size,
+            mtime,
+            perms,
+        })
+        .collect())
 }
 
 async fn do_test(profile: &Profile) -> anyhow::Result<String> {
@@ -150,32 +195,134 @@ async fn run_sync(app: &AppHandle, profile: &Profile) -> anyhow::Result<SyncStat
             stats.uploaded, stats.skipped, stats.errors
         ),
     );
+    crate::notifications::notify_sync(
+        app,
+        profile,
+        &crate::notifications::BatchStats {
+            uploaded: stats.uploaded,
+            deleted: stats.deleted,
+            errors: stats.errors,
+            first_errors: Vec::new(),
+        },
+    );
     Ok(stats)
 }
 
 #[tauri::command]
 pub fn start_watch(app: AppHandle, state: State<AppState>, profile: Profile) -> Result<(), String> {
-    let mut watchers = state.watchers.lock().map_err(|e| e.to_string())?;
-    if watchers.contains_key(&profile.id) {
-        return Ok(()); // ya está vigilando
-    }
-    let handle = tauri::async_runtime::spawn(watcher::run(app.clone(), profile.clone()));
-    watchers.insert(profile.id, handle);
+    let count = {
+        let mut watchers = state.watchers.lock().map_err(|e| e.to_string())?;
+        if watchers.contains_key(&profile.id) {
+            return Ok(()); // ya está vigilando
+        }
+        let handle = tauri::async_runtime::spawn(watcher::run(app.clone(), profile.clone()));
+        watchers.insert(profile.id, handle);
+        watchers.len()
+    };
+    update_tray(&app, count);
     Ok(())
 }
 
 #[tauri::command]
 pub fn stop_watch(app: AppHandle, state: State<AppState>, profile_id: String) -> Result<(), String> {
-    let mut watchers = state.watchers.lock().map_err(|e| e.to_string())?;
-    if let Some(handle) = watchers.remove(&profile_id) {
-        handle.abort();
-    }
+    let count = {
+        let mut watchers = state.watchers.lock().map_err(|e| e.to_string())?;
+        if let Some(handle) = watchers.remove(&profile_id) {
+            handle.abort();
+        }
+        watchers.len()
+    };
+    update_tray(&app, count);
     events::watch_state(&app, &profile_id, false);
     Ok(())
+}
+
+/// Actualiza el tooltip de la bandeja con el número de perfiles en vigilancia.
+pub(crate) fn update_tray(app: &AppHandle, count: usize) {
+    if let Some(tray) = app.tray_by_id(crate::TRAY_ID) {
+        let txt = if count == 0 {
+            "SFTP Sync".to_string()
+        } else {
+            format!("SFTP Sync — {count} vigilando")
+        };
+        let _ = tray.set_tooltip(Some(txt));
+    }
 }
 
 #[tauri::command]
 pub fn list_watching(state: State<AppState>) -> Result<Vec<String>, String> {
     let watchers = state.watchers.lock().map_err(|e| e.to_string())?;
     Ok(watchers.keys().cloned().collect())
+}
+
+// ---------------------------------------------------------------------------
+// Ajustes globales
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn load_settings(app: AppHandle) -> Result<Settings, String> {
+    Settings::load(&settings_path(&app)?).map_err(|e| e.to_string())
+}
+
+/// Guarda los ajustes y los aplica (Dock, bandeja, arranque con el sistema).
+#[tauri::command]
+pub fn save_settings(app: AppHandle, mut settings: Settings) -> Result<Settings, String> {
+    // Salvaguarda: no permitir ocultar Dock y bandeja a la vez (quedaría inaccesible).
+    if !settings.show_in_dock && !settings.show_tray {
+        settings.show_tray = true;
+    }
+    settings
+        .save(&settings_path(&app)?)
+        .map_err(|e| e.to_string())?;
+    apply_settings(&app, &settings);
+    Ok(settings)
+}
+
+/// Aplica los ajustes que afectan al sistema (Dock, bandeja, arranque).
+pub(crate) fn apply_settings(app: &AppHandle, settings: &Settings) {
+    // Visibilidad en la bandeja.
+    if let Some(tray) = app.tray_by_id(crate::TRAY_ID) {
+        let _ = tray.set_visible(settings.show_tray);
+    }
+
+    // Visibilidad en el Dock (solo macOS).
+    #[cfg(target_os = "macos")]
+    {
+        let policy = if settings.show_in_dock {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        };
+        let _ = app.set_activation_policy(policy);
+    }
+
+    // Arranque con el sistema.
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        let mgr = app.autolaunch();
+        if settings.launch_at_login {
+            let _ = mgr.enable();
+        } else {
+            let _ = mgr.disable();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Importar / exportar perfiles
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn export_config(app: AppHandle, path: String) -> Result<(), String> {
+    let cfg = Config::load(&config_path(&app)?).map_err(|e| e.to_string())?;
+    let raw = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
+    std::fs::write(&path, raw).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_config(app: AppHandle, path: String) -> Result<Config, String> {
+    let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let cfg: Config = serde_json::from_str(&raw).map_err(|e| format!("JSON inválido: {e}"))?;
+    cfg.save(&config_path(&app)?).map_err(|e| e.to_string())?;
+    Ok(cfg)
 }

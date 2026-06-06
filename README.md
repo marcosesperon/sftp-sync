@@ -27,17 +27,24 @@ Sube ficheros automáticamente al guardar (watcher), respeta patrones `ignore`, 
 | **Borrar en remoto al borrar local** | Propaga los borrados locales al remoto, **ficheros y carpetas** (rmdir recursivo). |
 | **Sincronizar carpetas vacías** | Crea también los directorios sin contenido en el remoto. |
 | **Modo espejo** | En la sincronización completa, **borra del remoto** lo que ya no existe en local (o está ignorado). Convierte la subida en un espejo real. |
-| **Patrones `ignore`** | Lista de patrones estilo glob/gitignore (`.git`, `.vscode`, `.DS_Store`, `node_modules/**`, …). |
+| **Patrones `include`** | Qué ficheros sincronizar (estilo glob). Por defecto `**/*` (todo). Útil para subir solo ciertos tipos: p. ej. `*.php`, `*.js`. Un patrón sin barra (`*.php`) casa a cualquier profundidad. |
+| **Patrones `ignore`** | Lista de patrones a excluir, estilo glob/gitignore (`.git`, `.vscode`, `.DS_Store`, `node_modules/**`, …). Se aplica **después** de `include`. |
+| **Notificaciones** | Notificaciones nativas del sistema: `Ninguna` · `Solo errores` · `Resumen` (una por ráfaga del watcher / por sync) · `Todas` (una por acción, con tope anti-spam). Se agrupan aprovechando el *debounce* del watcher. |
 
 ### Interfaz
 - **Gestión de múltiples perfiles** con barra lateral; indicador verde de qué perfiles tienen el watcher activo.
 - **Duplicar perfil** con un clic (botón ⧉ al pasar el ratón).
 - **Selectores nativos** de fichero (clave privada) y de carpeta (raíz local).
 - **Modo monitorización:** cuando el watcher está activo, la pantalla se centra en los logs (nombre del perfil + datos de conexión + botón de detener + paneles a pantalla completa), ocultando la configuración.
-- **Panel de log con dos pestañas:**
+- **Panel inferior con tres pestañas:**
   - **Actividad** — operaciones del backend (`↑ subido`, `🗑 borrado`, `📁 carpeta`, errores…).
   - **Comandos** — registro de cada llamada al backend con argumentos, resultado y **tiempo en ms** (las contraseñas y *passphrases* nunca se registran).
+  - **Explorador** — navegación del árbol de ficheros remoto vía SFTP (entrar en carpetas, subir de nivel, tamaños), partiendo de la ruta remota del perfil.
 - **Menú contextual del navegador desactivado** (salvo en campos de texto, para conservar copiar/pegar).
+- **Icono en la bandeja del sistema:** al cerrar la ventana, la app **se minimiza a la bandeja y sigue vigilando en segundo plano**. Desde la bandeja: mostrar la ventana o salir; el tooltip indica cuántos perfiles están activos. Clic en el icono (o en el Dock en macOS) reabre la ventana. **Instancia única** (un segundo arranque enfoca la ventana existente).
+- **Tema claro/oscuro** automático según el sistema operativo (o forzado desde ajustes).
+- **Multiidioma** (español / inglés), por defecto el del sistema.
+- **Pantalla de ajustes** con: idioma, tema, mostrar/ocultar en Dock (macOS) y bandeja, iniciar watchers al abrir la app (perfiles con "Subir al guardar"), abrir al iniciar el ordenador, e **importar/exportar** la configuración de perfiles.
 
 ---
 
@@ -69,6 +76,8 @@ Sube ficheros automáticamente al guardar (watcher), respeta patrones `ignore`, 
 pnpm install
 pnpm tauri dev      # arranca la app con hot-reload del frontend
 ```
+
+> En **macOS**, las notificaciones nativas se entregan de forma fiable en la app empaquetada (`.app`); en `pnpm tauri dev` pueden no aparecer. Pruébalas con `pnpm tauri build`.
 
 ## 📦 Empaquetado
 
@@ -160,10 +169,12 @@ Normalmente no hace falta editarlo a mano (todo se gestiona desde la UI), pero e
       "localRoot": "/Users/tu/proyecto",     // carpeta local a sincronizar
       "remotePath": "/var/www/",             // carpeta remota destino
       "ignore": [".git", ".vscode", ".DS_Store", ".github/**"],
+      "include": ["**/*"],                   // qué sincronizar (**/* = todo; p. ej. ["*.php"])
       "uploadOnSave": true,                  // activar watcher
       "autoDelete": false,                   // propagar borrados (ficheros y carpetas)
       "syncEmptyDirs": false,                // crear carpetas vacías
-      "mirrorDelete": false                  // modo espejo (borrar huérfanos en remoto)
+      "mirrorDelete": false,                 // modo espejo (borrar huérfanos en remoto)
+      "notify": "errors"                     // "off" | "errors" | "summary" | "all"
     }
   ]
 }
@@ -216,8 +227,8 @@ src-tauri/src/
 - [ ] Verificación de host key (known_hosts).
 - [ ] Credenciales en el keychain del SO ([`keyring`](https://crates.io/crates/keyring)).
 - [ ] Soporte **FTP/FTPS** ([`suppaftp`](https://crates.io/crates/suppaftp)).
-- [ ] Explorador de ficheros remoto en la UI.
-- [ ] Icono en la bandeja del sistema (seguir vigilando con la ventana cerrada).
+- [x] Explorador de ficheros remoto en la UI.
+- [x] Icono en la bandeja del sistema (seguir vigilando con la ventana cerrada).
 - [ ] Importar configuración desde un fichero `sftp.json` existente.
 - [ ] Firma y notarización de los binarios (Apple Developer ID / Windows code signing).
 

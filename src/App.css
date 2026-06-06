@@ -1,4 +1,5 @@
 :root {
+  /* Tema oscuro (por defecto) */
   --bg: #1e1f22;
   --panel: #2b2d31;
   --panel-2: #232428;
@@ -8,8 +9,58 @@
   --accent: #4f86f7;
   --ok: #57c98a;
   --err: #f07c7c;
+  --danger-bg: #6e2b2b;
+  --danger-fg: #ffd7d7;
+
+  /* Hace que controles nativos (radios, checks, scrollbars) sigan el tema. */
+  color-scheme: light dark;
   font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
+}
+
+/* Paleta clara (compartida por el modo automático y el forzado) */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f2f3f5;
+    --panel: #ffffff;
+    --panel-2: #f6f7f9;
+    --border: #d6d9de;
+    --text: #1d1f23;
+    --muted: #6a6f76;
+    --accent: #2f6fed;
+    --ok: #1f9d57;
+    --err: #d23b3b;
+    --danger-bg: #fdecec;
+    --danger-fg: #b3261e;
+  }
+}
+
+/* Tema forzado desde ajustes (data-theme) — gana sobre el del sistema */
+:root[data-theme="light"] {
+  --bg: #f2f3f5;
+  --panel: #ffffff;
+  --panel-2: #f6f7f9;
+  --border: #d6d9de;
+  --text: #1d1f23;
+  --muted: #6a6f76;
+  --accent: #2f6fed;
+  --ok: #1f9d57;
+  --err: #d23b3b;
+  --danger-bg: #fdecec;
+  --danger-fg: #b3261e;
+}
+:root[data-theme="dark"] {
+  --bg: #1e1f22;
+  --panel: #2b2d31;
+  --panel-2: #232428;
+  --border: #3a3c42;
+  --text: #e6e6e6;
+  --muted: #9aa0a6;
+  --accent: #4f86f7;
+  --ok: #57c98a;
+  --err: #f07c7c;
+  --danger-bg: #6e2b2b;
+  --danger-fg: #ffd7d7;
 }
 
 * {
@@ -159,6 +210,89 @@ body {
 .about-close:hover {
   border-color: var(--accent);
 }
+
+/* Pie de la barra lateral: enlaces Ajustes / Acerca de */
+.foot-links {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+/* Modal de ajustes */
+.settings-modal {
+  text-align: left;
+  min-width: 420px;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.settings-modal .about-title {
+  text-align: left;
+  margin-bottom: 14px;
+}
+.settings-section {
+  margin-bottom: 18px;
+}
+.settings-h {
+  margin: 0 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.settings-row label {
+  color: var(--text);
+  font-size: 13px;
+}
+.settings-row select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+}
+.settings-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.settings-check input {
+  margin-top: 2px;
+}
+.settings-btns {
+  display: flex;
+  gap: 8px;
+}
+.settings-btns button {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+.settings-btns button:hover {
+  border-color: var(--accent);
+}
+.settings-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
 .bmc-btn {
   display: flex;
   align-items: center;
@@ -251,6 +385,58 @@ body {
   overflow-y: auto;
   flex: 1 1 auto;
 }
+
+/* Vista de edición: cabecera fija + cuerpo con scroll + acciones fijas */
+.edit {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.edit-header {
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.edit-header .form-row {
+  margin-bottom: 0;
+}
+.edit-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 4px 20px 12px;
+}
+
+/* Secciones agrupadas */
+.section {
+  padding: 14px 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+.section:last-child {
+  border-bottom: none;
+}
+.section-title {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+/* Radios de notificaciones */
+.radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+}
+.radios .radio {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  cursor: pointer;
+}
 .fields {
   border: 0;
   margin: 0;
@@ -276,6 +462,13 @@ body {
 .form-row label {
   font-size: 12px;
   color: var(--muted);
+}
+.form-row label code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: var(--panel-2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
 }
 input,
 textarea {
@@ -364,7 +557,12 @@ textarea {
 .actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
 }
 .actions button {
   background: var(--panel);
@@ -373,6 +571,7 @@ textarea {
   padding: 8px 14px;
   border-radius: 6px;
   cursor: pointer;
+  font: inherit;
 }
 .actions button:hover {
   border-color: var(--accent);
@@ -383,13 +582,25 @@ textarea {
   color: white;
 }
 .actions button.danger {
-  background: #5a2a2a;
+  background: var(--danger-bg);
   border-color: var(--err);
-  color: #ffd7d7;
+  color: var(--danger-fg);
 }
 .actions button.ghost {
   margin-left: auto;
   color: var(--muted);
+}
+
+/* Botón "Detener watcher" de la vista de monitorización */
+.watching-head .danger {
+  background: var(--danger-bg);
+  border: 1px solid var(--err);
+  color: var(--danger-fg);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  flex: 0 0 auto;
 }
 
 /* Vista de monitorización (watcher activo) */
@@ -492,6 +703,103 @@ textarea {
 }
 .cmd-ms {
   color: #6b7178;
+}
+
+/* Explorador remoto */
+.log-body.explorer {
+  padding: 0;
+}
+.explorer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--panel-2);
+}
+.explorer-up {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 2px 8px;
+  font: inherit;
+}
+.explorer-up:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.explorer-path {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explorer-head,
+.explorer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+.explorer-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.explorer-row.dir {
+  cursor: pointer;
+}
+.explorer-row.dir:hover {
+  background: var(--panel);
+}
+.ex-icon {
+  width: 16px;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.ex-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ex-perms {
+  flex: 0 0 auto;
+  width: 92px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.ex-date {
+  flex: 0 0 auto;
+  width: 124px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.ex-size {
+  flex: 0 0 auto;
+  width: 70px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+}
+.explorer-msg {
+  padding: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.explorer-msg.error {
+  color: var(--err);
 }
 .log-body {
   flex: 1;

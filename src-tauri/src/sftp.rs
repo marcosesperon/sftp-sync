@@ -207,7 +207,7 @@ impl SftpConnection {
         Ok(())
     }
 
-    /// Lista las entradas de un directorio remoto (nombres). Útil para test/explorador.
+    /// Lista las entradas de un directorio remoto (nombres). Útil para test.
     pub async fn list_dir(&self, remote: &str) -> Result<Vec<String>> {
         let entries = self
             .sftp
@@ -215,6 +215,33 @@ impl SftpConnection {
             .await
             .with_context(|| format!("no se pudo listar {remote}"))?;
         Ok(entries.map(|e| e.file_name()).collect())
+    }
+
+    /// Lista un directorio remoto para el explorador.
+    /// Devuelve `(nombre, es_directorio, tamaño_bytes, mtime_unix, permisos)`.
+    pub async fn list_dir_entries(
+        &self,
+        remote: &str,
+    ) -> Result<Vec<(String, bool, u64, Option<i64>, String)>> {
+        let entries = self
+            .sftp
+            .read_dir(remote)
+            .await
+            .with_context(|| format!("no se pudo listar {remote}"))?;
+        let mut out = Vec::new();
+        for e in entries {
+            let name = e.file_name();
+            if name == "." || name == ".." {
+                continue;
+            }
+            let md = e.metadata();
+            let is_dir = e.file_type().is_dir();
+            let size = md.size.unwrap_or(0);
+            let mtime = md.mtime.map(|t| t as i64);
+            let perms = format_permissions(md.permissions, is_dir);
+            out.push((name, is_dir, size, mtime, perms));
+        }
+        Ok(out)
     }
 
     /// `mkdir -p` remoto: crea cada componente ignorando los que ya existen.
@@ -239,4 +266,26 @@ impl SftpConnection {
         }
         Ok(())
     }
+}
+
+/// Formatea los bits de permiso (modo Unix) como `drwxr-xr-x`.
+fn format_permissions(mode: Option<u32>, is_dir: bool) -> String {
+    let m = match mode {
+        Some(m) => m,
+        None => return String::new(),
+    };
+    let bit = |mask: u32, ch: char| if m & mask != 0 { ch } else { '-' };
+    format!(
+        "{}{}{}{}{}{}{}{}{}{}",
+        if is_dir { 'd' } else { '-' },
+        bit(0o400, 'r'),
+        bit(0o200, 'w'),
+        bit(0o100, 'x'),
+        bit(0o040, 'r'),
+        bit(0o020, 'w'),
+        bit(0o010, 'x'),
+        bit(0o004, 'r'),
+        bit(0o002, 'w'),
+        bit(0o001, 'x'),
+    )
 }

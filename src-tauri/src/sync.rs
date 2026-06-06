@@ -54,6 +54,7 @@ pub async fn sync_all<F: Fn(&str)>(
         return Err(anyhow!("la raíz local no existe: {}", profile.local_root));
     }
     let set: GlobSet = ignore::build(&profile.ignore)?;
+    let include = ignore::build_include(&profile.include)?;
     let mut stats = SyncStats::default();
     // Conjunto de rutas relativas subidas, para el modo espejo.
     let mut local_files: HashSet<String> = HashSet::new();
@@ -77,15 +78,21 @@ pub async fn sync_all<F: Fn(&str)>(
             continue;
         }
 
-        // Directorios: solo se crean si la opción está activa.
+        // Directorios: solo se crean si la opción está activa y pasan el filtro.
         if entry.file_type().is_dir() {
-            if profile.sync_empty_dirs {
+            if profile.sync_empty_dirs && ignore::is_included(&include, &rel) {
                 let remote = remote_join(&profile.remote_path, &rel);
                 let _ = conn.ensure_dir(&remote).await;
             }
             continue;
         }
         if !entry.file_type().is_file() {
+            continue;
+        }
+
+        // Filtro de inclusión: si no coincide, se omite.
+        if !ignore::is_included(&include, &rel) {
+            stats.skipped += 1;
             continue;
         }
 

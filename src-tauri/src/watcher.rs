@@ -10,9 +10,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tauri::AppHandle;
 
-use crate::config::Profile;
+use crate::config::{NotifyMode, Profile};
 use crate::events;
 use crate::ignore;
+use crate::notifications;
 use crate::sftp::SftpConnection;
 use crate::sync;
 
@@ -33,6 +34,14 @@ pub async fn run(app: AppHandle, profile: Profile) {
         Ok(s) => s,
         Err(e) => {
             events::log(&app, &profile.id, "error", format!("patrones ignore inválidos: {e}"));
+            events::watch_state(&app, &profile.id, false);
+            return;
+        }
+    };
+    let include = match ignore::build_include(&profile.include) {
+        Ok(s) => s,
+        Err(e) => {
+            events::log(&app, &profile.id, "error", format!("patrones de inclusión inválidos: {e}"));
             events::watch_state(&app, &profile.id, false);
             return;
         }
@@ -87,12 +96,21 @@ pub async fn run(app: AppHandle, profile: Profile) {
             }
         }
 
+        // Contadores del lote para las notificaciones de resumen/errores.
+        let mut batch = notifications::BatchStats::default();
+        let mut all_sent = 0usize;
+        let mut all_overflow = 0usize;
+
         for path in paths {
             let rel = match sync::rel_posix(&local_root, &path) {
                 Some(r) => r,
                 None => continue,
             };
             if ignore::is_ignored(&set, &rel) {
+                continue;
+            }
+            // Filtro de inclusión (qué ficheros sincronizar).
+            if !ignore::is_included(&include, &rel) {
                 continue;
             }
 
@@ -135,14 +153,39 @@ pub async fn run(app: AppHandle, profile: Profile) {
             };
 
             match result {
-                Ok(msg) => events::log(&app, &profile.id, "ok", msg),
+                Ok(msg) => {
+                    // Contadores para el resumen.
+                    if is_file {
+                        batch.uploaded += 1;
+                    } else if removed {
+                        batch.deleted += 1;
+                    }
+                    // Modo "Todas": una notificación por acción, con tope anti-spam.
+                    if profile.notify == NotifyMode::All {
+                        if all_sent < notifications::ALL_MODE_CAP {
+                            notifications::notify_action(&app, &profile, &msg);
+                            all_sent += 1;
+                        } else {
+                            all_overflow += 1;
+                        }
+                    }
+                    events::log(&app, &profile.id, "ok", msg);
+                }
                 Err(e) => {
+                    batch.errors += 1;
+                    if batch.first_errors.len() < 3 {
+                        batch.first_errors.push(rel.clone());
+                    }
                     events::log(&app, &profile.id, "error", format!("✗ {rel}: {e}"));
                     // Posible sesión caída: forzar reconexión en el próximo evento.
                     conn = None;
                 }
             }
         }
+
+        // Cierre del lote: notificaciones de resumen/errores (y "y N más" en modo Todas).
+        notifications::notify_all_overflow(&app, &profile, all_overflow);
+        notifications::maybe_notify(&app, &profile, &batch);
     }
 
     events::watch_state(&app, &profile.id, false);

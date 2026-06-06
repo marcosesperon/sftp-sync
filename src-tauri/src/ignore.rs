@@ -52,3 +52,42 @@ fn expand(p: &str) -> Vec<String> {
 pub fn is_ignored(set: &GlobSet, rel_posix: &str) -> bool {
     set.is_match(rel_posix)
 }
+
+/// Compila patrones de **inclusión** (qué ficheros sincronizar).
+///
+/// Devuelve `None` cuando equivale a "incluir todo" (lista vacía o que contiene
+/// `**/*` / `**`), de modo que no se aplica ningún filtro. Por cada patrón sin
+/// barra añade también la variante `**/patrón` para que, p. ej., `*.php` case a
+/// cualquier profundidad.
+pub fn build_include(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {
+    let meaningful: Vec<&str> = patterns
+        .iter()
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+        .collect();
+
+    if meaningful.is_empty() || meaningful.iter().any(|p| *p == "**/*" || *p == "**") {
+        return Ok(None); // incluir todo
+    }
+
+    let mut builder = GlobSetBuilder::new();
+    for p in meaningful {
+        if let Ok(glob) = Glob::new(p) {
+            builder.add(glob);
+        }
+        if !p.contains('/') {
+            if let Ok(glob) = Glob::new(&format!("**/{p}")) {
+                builder.add(glob);
+            }
+        }
+    }
+    Ok(Some(builder.build()?))
+}
+
+/// Devuelve `true` si `rel_posix` debe incluirse. `None` = incluir todo.
+pub fn is_included(set: &Option<GlobSet>, rel_posix: &str) -> bool {
+    match set {
+        None => true,
+        Some(s) => s.is_match(rel_posix),
+    }
+}
