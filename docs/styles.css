@@ -106,6 +106,12 @@ nav {
   place-items: center;
   color: #07120f;
 }
+.brand .logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: block;
+}
 .nav-links {
   display: flex;
   gap: 24px;
