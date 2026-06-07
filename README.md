@@ -4,6 +4,31 @@
 
 Sube ficheros automáticamente al guardar (watcher), respeta patrones `ignore`, soporta múltiples perfiles y autenticación con clave privada o contraseña. Construida con **Tauri 2 + React** y un núcleo en **Rust puro** (sin dependencias nativas en C), lo que produce binarios pequeños y rápidos.
 
+## 📸 Capturas
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/perfil.png" alt="Edición de un perfil" />
+      <sub>Edición de un perfil (pestañas Conexión / Sincronización / Notificaciones)</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/explorador.png" alt="Explorador de ficheros remoto" />
+      <sub>Explorador remoto con menú contextual y selección múltiple</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/ajustes.png" alt="Pantalla de ajustes" />
+      <sub>Ajustes: idioma, tema, ventana/arranque y seguridad</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/actividad.png" alt="Monitorización en segundo plano" />
+      <sub>Monitorización en segundo plano con el watcher activo</sub>
+    </td>
+  </tr>
+</table>
+
 ---
 
 ## ✨ Funcionalidad
