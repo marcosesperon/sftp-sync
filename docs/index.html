@@ -1,0 +1,1005 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SFTP Sync — sincronización SFTP de escritorio, nativa y multiplataforma</title>
+    <meta
+      name="description"
+      content="GUI de escritorio (macOS · Windows · Linux) para sincronización SFTP: sube al guardar, multi-perfil, explorador remoto, verificación de host key. Tauri + Rust."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c0e12'/%3E%3Cpath d='M10 12h9l-3-3M22 20h-9l3 3' stroke='%234ee1c2' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0c0e12;
+        --bg-2: #0f131a;
+        --panel: #141925;
+        --panel-2: #1a2030;
+        --border: #232a3a;
+        --text: #e8ecf2;
+        --muted: #8b95a7;
+        --accent: #4ee1c2;
+        --accent-2: #6aa6ff;
+        --warm: #ffd23f;
+        --err: #f0746a;
+        --radius: 16px;
+        --maxw: 1120px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Hanken Grotesk", system-ui, sans-serif;
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      /* Fondo: rejilla de puntos + resplandores */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -2;
+        background-image: radial-gradient(
+          circle at 1px 1px,
+          rgba(255, 255, 255, 0.04) 1px,
+          transparent 0
+        );
+        background-size: 26px 26px;
+        mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 40%, transparent 100%);
+      }
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -3;
+        background:
+          radial-gradient(50% 40% at 78% 8%, rgba(78, 225, 194, 0.13), transparent 70%),
+          radial-gradient(45% 45% at 12% 20%, rgba(106, 166, 255, 0.1), transparent 70%);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: "Bricolage Grotesque", sans-serif;
+        font-weight: 800;
+        line-height: 1.04;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .wrap {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+      .accent {
+        color: var(--accent);
+      }
+
+      /* ---- Nav ---- */
+      nav {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        backdrop-filter: blur(12px);
+        background: rgba(12, 14, 18, 0.72);
+        border-bottom: 1px solid var(--border);
+      }
+      .nav-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: "Bricolage Grotesque", sans-serif;
+        font-weight: 700;
+        font-size: 19px;
+      }
+      .brand .glyph {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        background: linear-gradient(140deg, var(--accent), var(--accent-2));
+        display: grid;
+        place-items: center;
+        color: #07120f;
+      }
+      .nav-links {
+        display: flex;
+        gap: 28px;
+        align-items: center;
+        font-size: 15px;
+        color: var(--muted);
+      }
+      .nav-links a:hover {
+        color: var(--text);
+      }
+      .nav-cta {
+        border: 1px solid var(--border);
+        padding: 7px 16px;
+        border-radius: 99px;
+        color: var(--text) !important;
+      }
+      .nav-cta:hover {
+        border-color: var(--accent);
+      }
+      @media (max-width: 760px) {
+        .nav-links a:not(.nav-cta) {
+          display: none;
+        }
+      }
+
+      /* ---- Hero ---- */
+      .hero {
+        padding: 90px 0 60px;
+        display: grid;
+        grid-template-columns: 1.05fr 1fr;
+        gap: 56px;
+        align-items: center;
+      }
+      @media (max-width: 940px) {
+        .hero {
+          grid-template-columns: 1fr;
+          padding: 56px 0 40px;
+        }
+      }
+      .tagpill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12.5px;
+        color: var(--accent);
+        border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+        background: color-mix(in srgb, var(--accent) 8%, transparent);
+        padding: 5px 12px;
+        border-radius: 99px;
+      }
+      .hero h1 {
+        font-size: clamp(40px, 6.2vw, 72px);
+        margin: 22px 0 0;
+      }
+      .hero h1 .grad {
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .hero p.lead {
+        color: var(--muted);
+        font-size: 19px;
+        max-width: 30em;
+        margin: 22px 0 0;
+      }
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 34px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 22px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 15.5px;
+        border: 1px solid var(--border);
+        transition: transform 0.12s ease, border-color 0.15s, background 0.15s;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), #38c8ad);
+        color: #06130f;
+        border-color: transparent;
+        box-shadow: 0 10px 30px -10px var(--accent);
+      }
+      .btn-ghost:hover {
+        border-color: var(--accent);
+      }
+      .hero-note {
+        margin-top: 16px;
+        font-size: 13.5px;
+        color: var(--muted);
+      }
+
+      /* ---- App mockup ---- */
+      .mockup {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--panel);
+        overflow: hidden;
+        box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8);
+        transform: perspective(1400px) rotateY(-8deg) rotateX(3deg);
+      }
+      .mock-bar {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 11px 14px;
+        background: var(--panel-2);
+        border-bottom: 1px solid var(--border);
+      }
+      .mock-bar i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #3a4356;
+      }
+      .mock-bar i:nth-child(1) {
+        background: #f0746a;
+      }
+      .mock-bar i:nth-child(2) {
+        background: #ffd23f;
+      }
+      .mock-bar i:nth-child(3) {
+        background: #4ee1c2;
+      }
+      .mock-title {
+        margin-left: 10px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .mock-body {
+        display: grid;
+        grid-template-columns: 116px 1fr;
+        min-height: 256px;
+      }
+      .mock-side {
+        border-right: 1px solid var(--border);
+        padding: 12px 10px;
+        background: var(--bg-2);
+        font-size: 12.5px;
+      }
+      .mock-side .ph {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 10px;
+      }
+      .mock-prof {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 7px;
+        border-radius: 7px;
+        margin-bottom: 3px;
+      }
+      .mock-prof.on {
+        background: var(--panel-2);
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #46506a;
+      }
+      .dot.live {
+        background: var(--accent);
+        box-shadow: 0 0 8px var(--accent);
+      }
+      .mock-log {
+        padding: 12px 14px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12.5px;
+        line-height: 1.9;
+      }
+      .mock-log .tab {
+        color: var(--accent);
+        border-bottom: 2px solid var(--accent);
+        padding-bottom: 4px;
+        margin-right: 14px;
+        font-size: 11px;
+      }
+      .mock-log .tab.off {
+        color: var(--muted);
+        border-color: transparent;
+      }
+      .logline {
+        opacity: 0;
+        animation: rise 0.5s ease forwards;
+      }
+      .logline .up {
+        color: var(--accent);
+      }
+      .logline .del {
+        color: var(--warm);
+      }
+      .logline .path {
+        color: var(--text);
+      }
+      .logline:nth-child(2) {
+        animation-delay: 0.5s;
+      }
+      .logline:nth-child(3) {
+        animation-delay: 1s;
+      }
+      .logline:nth-child(4) {
+        animation-delay: 1.5s;
+      }
+      .logline:nth-child(5) {
+        animation-delay: 2s;
+      }
+      .logline:nth-child(6) {
+        animation-delay: 2.5s;
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      /* ---- Tech strip ---- */
+      .strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 34px;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 0 8px;
+        color: var(--muted);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+      }
+      .strip b {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      /* ---- Sections ---- */
+      section {
+        padding: 76px 0;
+      }
+      .sec-head {
+        max-width: 640px;
+        margin-bottom: 44px;
+      }
+      .kicker {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .sec-head h2 {
+        font-size: clamp(30px, 4.2vw, 46px);
+        margin-top: 12px;
+      }
+      .sec-head p {
+        color: var(--muted);
+        margin-top: 14px;
+      }
+
+      /* Features grid */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      @media (max-width: 880px) {
+        .grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 560px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .card {
+        background: linear-gradient(180deg, var(--panel), var(--bg-2));
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        transition: transform 0.15s, border-color 0.15s;
+      }
+      .card:hover {
+        transform: translateY(-4px);
+        border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+      }
+      .card .ico {
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        display: grid;
+        place-items: center;
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+        color: var(--accent);
+        margin-bottom: 16px;
+      }
+      .card h3 {
+        font-size: 19px;
+        font-weight: 700;
+      }
+      .card p {
+        color: var(--muted);
+        font-size: 15px;
+        margin: 8px 0 0;
+      }
+
+      /* Steps */
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        counter-reset: step;
+      }
+      @media (max-width: 760px) {
+        .steps {
+          grid-template-columns: 1fr;
+        }
+      }
+      .step {
+        position: relative;
+        padding: 26px 22px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg-2);
+      }
+      .step::before {
+        counter-increment: step;
+        content: "0" counter(step);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        color: var(--accent);
+      }
+      .step h3 {
+        font-size: 18px;
+        margin: 10px 0 6px;
+      }
+      .step p {
+        color: var(--muted);
+        font-size: 15px;
+        margin: 0;
+      }
+
+      /* Config / code block */
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1.15fr;
+        gap: 40px;
+        align-items: center;
+      }
+      @media (max-width: 880px) {
+        .split {
+          grid-template-columns: 1fr;
+        }
+      }
+      .code {
+        background: #0a0d12;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 30px 60px -30px #000;
+      }
+      .code-bar {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 10px 13px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel-2);
+      }
+      .code-bar span {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--muted);
+        margin-left: 8px;
+      }
+      pre {
+        margin: 0;
+        padding: 18px 20px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        line-height: 1.7;
+        overflow-x: auto;
+        color: #c8d2e0;
+      }
+      pre .k {
+        color: var(--accent-2);
+      }
+      pre .s {
+        color: var(--accent);
+      }
+      pre .c {
+        color: #5c6577;
+      }
+      .feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 20px 0 0;
+      }
+      .feature-list li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        margin-bottom: 14px;
+        color: var(--muted);
+        font-size: 15.5px;
+      }
+      .feature-list b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .feature-list .chk {
+        color: var(--accent);
+        flex: 0 0 auto;
+        margin-top: 3px;
+      }
+
+      /* Downloads */
+      .dl-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      @media (max-width: 760px) {
+        .dl-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .dl {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 28px 24px;
+        text-align: center;
+        background: linear-gradient(180deg, var(--panel), var(--bg-2));
+        transition: transform 0.15s, border-color 0.15s;
+      }
+      .dl:hover {
+        transform: translateY(-4px);
+        border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+      }
+      .dl .os {
+        font-family: "Bricolage Grotesque", sans-serif;
+        font-weight: 700;
+        font-size: 21px;
+      }
+      .dl .files {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 8px 0 18px;
+      }
+      .dl .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      .note {
+        margin-top: 26px;
+        padding: 16px 20px;
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .note b {
+        color: var(--text);
+      }
+
+      /* Security band */
+      .band {
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 44px;
+        background:
+          radial-gradient(60% 120% at 100% 0%, rgba(78, 225, 194, 0.1), transparent 60%),
+          var(--bg-2);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 36px;
+        align-items: center;
+      }
+      @media (max-width: 760px) {
+        .band {
+          grid-template-columns: 1fr;
+          padding: 30px;
+        }
+      }
+      .band h2 {
+        font-size: 30px;
+      }
+      .band p {
+        color: var(--muted);
+        margin-top: 12px;
+      }
+      .kv {
+        display: grid;
+        gap: 12px;
+      }
+      .kv div {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        font-size: 15px;
+      }
+      .kv .t {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--accent);
+        flex: 0 0 64px;
+      }
+
+      /* Footer */
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 50px 0 60px;
+        margin-top: 30px;
+      }
+      .foot {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 24px;
+        color: var(--muted);
+        font-size: 14.5px;
+      }
+      .foot a:hover {
+        color: var(--text);
+      }
+      .foot-links {
+        display: flex;
+        gap: 22px;
+        flex-wrap: wrap;
+      }
+      .bmc {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--warm);
+        color: #1a1300;
+        padding: 9px 16px;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+      .bmc:hover {
+        color: #1a1300;
+        filter: brightness(1.05);
+      }
+
+      /* reveal on scroll */
+      .reveal {
+        opacity: 0;
+        transform: translateY(22px);
+        transition: opacity 0.6s ease, transform 0.6s ease;
+      }
+      .reveal.in {
+        opacity: 1;
+        transform: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .reveal {
+          opacity: 1;
+          transform: none;
+        }
+        .logline {
+          animation: none;
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div class="wrap nav-inner">
+        <a class="brand" href="#top">
+          <span class="glyph">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9h10l-3-3"/><path d="M16 15H6l3 3"/></svg>
+          </span>
+          SFTP Sync
+        </a>
+        <div class="nav-links">
+          <a href="#features">Funciones</a>
+          <a href="#how">Cómo funciona</a>
+          <a href="#download">Descargas</a>
+          <a class="nav-cta" href="https://github.com/marcosesperon/sftp-sync" target="_blank" rel="noopener">GitHub ↗</a>
+        </div>
+      </div>
+    </nav>
+
+    <header id="top" class="wrap hero">
+      <div>
+        <span class="tagpill">● macOS · Windows · Linux — open source</span>
+        <h1>
+          Sincroniza por <span class="grad">SFTP</span><br />sin salir de tu flujo.
+        </h1>
+        <p class="lead">
+          Una app de escritorio que sube tus archivos al guardar, vigila carpetas
+          enteras y gestiona varios servidores. Nativa, ligera e independiente del
+          editor.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#download">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+            Descargar gratis
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/marcosesperon/sftp-sync" target="_blank" rel="noopener">Ver en GitHub</a>
+        </div>
+        <p class="hero-note">Sin telemetría · Binarios de ~5&nbsp;MB · Licencia MIT</p>
+      </div>
+
+      <div class="mockup" aria-hidden="true">
+        <div class="mock-bar">
+          <i></i><i></i><i></i>
+          <span class="mock-title">SFTP Sync — Producción</span>
+        </div>
+        <div class="mock-body">
+          <div class="mock-side">
+            <div class="ph">Perfiles</div>
+            <div class="mock-prof on"><span class="dot live"></span> Producción</div>
+            <div class="mock-prof"><span class="dot"></span> Staging</div>
+            <div class="mock-prof"><span class="dot"></span> Validación</div>
+          </div>
+          <div class="mock-log">
+            <div style="margin-bottom: 8px">
+              <span class="tab">Actividad</span><span class="tab off">Comandos</span><span class="tab off">Explorador</span>
+            </div>
+            <div class="logline"><span class="up">↑</span> <span class="path">src/index.php</span></div>
+            <div class="logline"><span class="up">↑</span> <span class="path">assets/app.css</span></div>
+            <div class="logline"><span class="up">↑</span> <span class="path">assets/app.js</span></div>
+            <div class="logline"><span class="del">🗑</span> <span class="path">tmp/old.log</span></div>
+            <div class="logline"><span class="up">📁</span> <span class="path">data/exports/</span></div>
+            <div class="logline" style="color: var(--muted)">Hecho: 12 subidos · 1 borrado · 0 errores</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap strip">
+      <span>Construido con</span>
+      <span><b>Tauri 2</b></span>
+      <span><b>React</b></span>
+      <span><b>Rust</b> puro (sin libssh2)</span>
+      <span><b>russh</b> · <b>notify</b></span>
+    </div>
+
+    <!-- FEATURES -->
+    <section id="features">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <span class="kicker">Funciones</span>
+          <h2>Todo lo que esperas de un sync SFTP, en una app de verdad.</h2>
+          <p>Pensada para desarrollo y despliegues: rápida, configurable y sin depender de ningún editor.</p>
+        </div>
+        <div class="grid">
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5-5 5 5"/><path d="M5 21h14"/></svg></div>
+            <h3>Subir al guardar</h3>
+            <p>Un watcher vigila tu carpeta y sube los cambios al instante, con agrupado inteligente de los guardados del editor.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg></div>
+            <h3>Multi-perfil</h3>
+            <p>Gestiona varios servidores, duplícalos con un clic y exporta/importa tu configuración cuando quieras.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+            <h3>Verificación de host key</h3>
+            <p>Modelo TOFU con <span class="mono">known_hosts</span> propio: confirma la huella la primera vez y avisa si la clave del servidor cambia.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+            <h3>Explorador remoto</h3>
+            <p>Navega el árbol remoto, renombra y elimina, selecciona en lote y arrastra ficheros locales para subirlos.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.5 21a2 2 0 0 0 3 0"/></svg></div>
+            <h3>Notificaciones nativas</h3>
+            <p>Avisos del sistema por perfil: solo errores, resumen por lote o todas las acciones. Tú eliges el ruido.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+            <h3>Segundo plano + bandeja</h3>
+            <p>Cierra la ventana y sigue vigilando desde la bandeja del sistema. Instancia única, sin duplicados.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
+            <h3>Tema y idioma</h3>
+            <p>Claro/oscuro automático según el sistema (o forzado) y multiidioma español / inglés.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7l-2 2M20 20h-7l2-2"/><path d="M4 9v11h11M20 15V4H9"/></svg></div>
+            <h3>Reglas finas</h3>
+            <p>Patrones <span class="mono">include</span>/<span class="mono">ignore</span>, modo espejo, carpetas vacías y borrado propagado.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+            <h3>Clave o contraseña</h3>
+            <p>Autenticación por clave privada (con passphrase) o contraseña, con compatibilidad RSA moderna (rsa-sha2).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW -->
+    <section id="how" style="padding-top: 10px">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <span class="kicker">Cómo funciona</span>
+          <h2>De cero a sincronizando en un minuto.</h2>
+        </div>
+        <div class="steps">
+          <div class="step reveal">
+            <h3>Crea un perfil</h3>
+            <p>Host, usuario y clave o contraseña. Elige la carpeta local y la ruta remota con el selector nativo.</p>
+          </div>
+          <div class="step reveal">
+            <h3>Prueba la conexión</h3>
+            <p>Verifica la clave del servidor una vez. A partir de ahí, todo conecta sin fricción.</p>
+          </div>
+          <div class="step reveal">
+            <h3>Activa el watcher</h3>
+            <p>Guarda en tu editor y los cambios viajan solos. Ciérrala a la bandeja y olvídate.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONFIG -->
+    <section>
+      <div class="wrap split">
+        <div class="reveal">
+          <span class="kicker">Control total</span>
+          <h2 style="font-size: clamp(28px, 3.6vw, 40px); margin-top: 12px">
+            Configuración clara, por perfil.
+          </h2>
+          <ul class="feature-list">
+            <li><span class="chk">✓</span><span><b>include / ignore</b> al estilo glob para subir justo lo que quieres.</span></li>
+            <li><span class="chk">✓</span><span><b>Modo espejo</b> para reflejar borrados en el remoto.</span></li>
+            <li><span class="chk">✓</span><span><b>autoDelete</b> y <b>carpetas vacías</b> configurables.</span></li>
+            <li><span class="chk">✓</span><span>Panel de <b>actividad, comandos y explorador</b> redimensionable.</span></li>
+          </ul>
+        </div>
+        <div class="code reveal">
+          <div class="code-bar"><i style="width:11px;height:11px;border-radius:50%;background:#f0746a;display:inline-block"></i><i style="width:11px;height:11px;border-radius:50%;background:#ffd23f;display:inline-block"></i><i style="width:11px;height:11px;border-radius:50%;background:#4ee1c2;display:inline-block"></i><span>profiles.json</span></div>
+<pre><span class="k">"host"</span>: <span class="s">"10.10.10.1"</span>,
+<span class="k">"port"</span>: <span class="s">22</span>,
+<span class="k">"username"</span>: <span class="s">"deploy"</span>,
+<span class="k">"localRoot"</span>: <span class="s">"~/web/app"</span>,
+<span class="k">"remotePath"</span>: <span class="s">"/var/www/"</span>,
+<span class="k">"include"</span>: [<span class="s">"**/*"</span>],
+<span class="k">"ignore"</span>: [<span class="s">".git"</span>, <span class="s">"node_modules/**"</span>],
+<span class="k">"uploadOnSave"</span>: <span class="s">true</span>,
+<span class="k">"autoDelete"</span>: <span class="s">false</span>   <span class="c">// modo espejo opcional</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECURITY -->
+    <section style="padding-top: 0">
+      <div class="wrap">
+        <div class="band reveal">
+          <div>
+            <span class="kicker">Seguridad</span>
+            <h2 style="margin-top: 12px">Conexiones que puedes verificar.</h2>
+            <p>Núcleo en Rust puro (sin dependencias nativas en C), verificación de host key estilo OpenSSH y credenciales fuera del alcance del editor.</p>
+          </div>
+          <div class="kv">
+            <div><span class="t">SSH</span><span>SFTP sobre <b>russh</b>, con autenticación por clave o contraseña.</span></div>
+            <div><span class="t">TOFU</span><span>Huella SHA256 al confiar y alerta si la clave del servidor cambia.</span></div>
+            <div><span class="t">LOCAL</span><span>Sin telemetría. Tu configuración vive solo en tu equipo.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section id="download" style="padding-top: 0">
+      <div class="wrap">
+        <div class="sec-head reveal" style="max-width: 720px">
+          <span class="kicker">Descargas</span>
+          <h2>Gratis para los tres sistemas.</h2>
+          <p>Elige tu plataforma. Cada release incluye los instaladores para todos los sistemas.</p>
+        </div>
+        <div class="dl-grid">
+          <div class="dl reveal" data-os="mac">
+            <div class="os">macOS</div>
+            <div class="files">.dmg · universal (Intel + Apple&nbsp;Silicon)</div>
+            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Descargar</a>
+          </div>
+          <div class="dl reveal" data-os="win">
+            <div class="os">Windows</div>
+            <div class="files">.exe (setup) · .msi</div>
+            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Descargar</a>
+          </div>
+          <div class="dl reveal" data-os="linux">
+            <div class="os">Linux</div>
+            <div class="files">.AppImage · .deb · .rpm</div>
+            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Descargar</a>
+          </div>
+        </div>
+        <div class="note reveal">
+          <b>Nota:</b> los binarios se distribuyen <b>sin firmar</b> (es una app gratuita). La primera vez, en macOS abre con <b>clic derecho → Abrir</b>; en Windows pulsa <b>"Más información → Ejecutar de todas formas"</b>. Instrucciones completas en el repositorio.
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap foot">
+        <div>
+          <div class="brand" style="font-size: 17px; margin-bottom: 10px">
+            <span class="glyph"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9h10l-3-3"/><path d="M16 15H6l3 3"/></svg></span>
+            SFTP Sync
+          </div>
+          Licencia MIT · por
+          <a href="https://github.com/marcosesperon" target="_blank" rel="noopener" style="color: var(--accent)">Marcos Esperón</a>
+        </div>
+        <div class="foot-links">
+          <a href="https://github.com/marcosesperon/sftp-sync" target="_blank" rel="noopener">Repositorio</a>
+          <a href="https://github.com/marcosesperon/sftp-sync/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/marcosesperon/sftp-sync/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+          <a class="bmc" href="https://buymeacoffee.com/marcosesperon" target="_blank" rel="noopener">☕ Hacer donación</a>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Revelado al hacer scroll
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add("in");
+              io.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.12 }
+      );
+      document.querySelectorAll(".reveal").forEach((el, i) => {
+        el.style.transitionDelay = (i % 3) * 70 + "ms";
+        io.observe(el);
+      });
+
+      // Resalta la descarga del SO del visitante
+      const p = navigator.platform.toLowerCase() + " " + navigator.userAgent.toLowerCase();
+      const os = p.includes("mac") ? "mac" : p.includes("win") ? "win" : p.includes("linux") ? "linux" : null;
+      if (os) {
+        const el = document.querySelector('.dl[data-os="' + os + '"]');
+        if (el) {
+          el.style.borderColor = "var(--accent)";
+          el.style.boxShadow = "0 0 0 1px var(--accent), 0 20px 50px -25px var(--accent)";
+        }
+      }
+    </script>
+  </body>
+</html>
