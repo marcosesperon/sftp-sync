@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SFTP Sync — sincronización SFTP de escritorio, nativa y multiplataforma</title>
+    <title>SFTP Sync — native, cross-platform desktop SFTP sync</title>
     <meta
       name="description"
-      content="GUI de escritorio (macOS · Windows · Linux) para sincronización SFTP: sube al guardar, multi-perfil, explorador remoto, verificación de host key. Tauri + Rust."
+      content="Desktop GUI (macOS · Windows · Linux) for SFTP sync: upload on save, multi-profile, remote explorer, host key verification. Built with Tauri + Rust."
     />
     <link
       rel="icon"
@@ -18,7 +18,7 @@
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="../styles.css" />
   </head>
   <body>
     <nav>
@@ -30,10 +30,10 @@
           SFTP Sync
         </a>
         <div class="nav-links">
-          <a class="hide-sm" href="#features">Funciones</a>
-          <a class="hide-sm" href="#how">Cómo funciona</a>
-          <a class="hide-sm" href="#download">Descargas</a>
-          <span class="lang"><a class="on">ES</a><a href="en/">EN</a></span>
+          <a class="hide-sm" href="#features">Features</a>
+          <a class="hide-sm" href="#how">How it works</a>
+          <a class="hide-sm" href="#download">Download</a>
+          <span class="lang"><a href="../">ES</a><a class="on">EN</a></span>
           <a class="nav-cta" href="https://github.com/marcosesperon/sftp-sync" target="_blank" rel="noopener">GitHub ↗</a>
         </div>
       </div>
@@ -42,125 +42,125 @@
     <header id="top" class="wrap hero">
       <div>
         <span class="tagpill">● macOS · Windows · Linux — open source</span>
-        <h1>Sincroniza por <span class="grad">SFTP</span><br />sin salir de tu flujo.</h1>
+        <h1>Sync over <span class="grad">SFTP</span><br />without leaving your flow.</h1>
         <p class="lead">
-          Una app de escritorio que sube tus archivos al guardar, vigila carpetas
-          enteras y gestiona varios servidores. Nativa, ligera e independiente del editor.
+          A desktop app that uploads your files on save, watches entire folders and
+          manages multiple servers. Native, lightweight and editor-independent.
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" href="#download">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
-            Descargar gratis
+            Download free
           </a>
-          <a class="btn btn-ghost" href="https://github.com/marcosesperon/sftp-sync" target="_blank" rel="noopener">Ver en GitHub</a>
+          <a class="btn btn-ghost" href="https://github.com/marcosesperon/sftp-sync" target="_blank" rel="noopener">View on GitHub</a>
         </div>
-        <p class="hero-note">Sin telemetría · Binarios de ~5&nbsp;MB · Licencia MIT</p>
+        <p class="hero-note">No telemetry · ~5&nbsp;MB binaries · MIT license</p>
       </div>
 
       <div class="mockup" aria-hidden="true">
         <div class="mock-bar">
           <i></i><i></i><i></i>
-          <span class="mock-title">SFTP Sync — Producción</span>
+          <span class="mock-title">SFTP Sync — Production</span>
         </div>
         <div class="mock-body">
           <div class="mock-side">
-            <div class="ph">Perfiles</div>
-            <div class="mock-prof on"><span class="dot live"></span> Producción</div>
+            <div class="ph">Profiles</div>
+            <div class="mock-prof on"><span class="dot live"></span> Production</div>
             <div class="mock-prof"><span class="dot"></span> Staging</div>
-            <div class="mock-prof"><span class="dot"></span> Validación</div>
+            <div class="mock-prof"><span class="dot"></span> QA</div>
           </div>
           <div class="mock-log">
             <div style="margin-bottom: 8px">
-              <span class="tab">Actividad</span><span class="tab off">Comandos</span><span class="tab off">Explorador</span>
+              <span class="tab">Activity</span><span class="tab off">Commands</span><span class="tab off">Explorer</span>
             </div>
             <div class="logline"><span class="up">↑</span> <span class="path">src/index.php</span></div>
             <div class="logline"><span class="up">↑</span> <span class="path">assets/app.css</span></div>
             <div class="logline"><span class="up">↑</span> <span class="path">assets/app.js</span></div>
             <div class="logline"><span class="del">🗑</span> <span class="path">tmp/old.log</span></div>
             <div class="logline"><span class="up">📁</span> <span class="path">data/exports/</span></div>
-            <div class="logline" style="color: var(--muted)">Hecho: 12 subidos · 1 borrado · 0 errores</div>
+            <div class="logline" style="color: var(--muted)">Done: 12 uploaded · 1 deleted · 0 errors</div>
           </div>
         </div>
       </div>
     </header>
 
     <div class="wrap strip">
-      <span>Construido con</span>
+      <span>Built with</span>
       <span><b>Tauri 2</b></span>
       <span><b>React</b></span>
-      <span><b>Rust</b> puro (sin libssh2)</span>
+      <span><b>Rust</b> (no libssh2)</span>
       <span><b>russh</b> · <b>notify</b></span>
     </div>
 
     <section id="features">
       <div class="wrap">
         <div class="sec-head reveal">
-          <span class="kicker">Funciones</span>
-          <h2>Todo lo que esperas de un sync SFTP, en una app de verdad.</h2>
-          <p>Pensada para desarrollo y despliegues: rápida, configurable y sin depender de ningún editor.</p>
+          <span class="kicker">Features</span>
+          <h2>Everything you expect from an SFTP sync, in a real app.</h2>
+          <p>Built for development and deployments: fast, configurable and editor-independent.</p>
         </div>
         <div class="grid">
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5-5 5 5"/><path d="M5 21h14"/></svg></div>
-            <h3>Subir al guardar</h3>
-            <p>Un watcher vigila tu carpeta y sube los cambios al instante, con agrupado inteligente de los guardados del editor.</p>
+            <h3>Upload on save</h3>
+            <p>A watcher monitors your folder and uploads changes instantly, smartly grouping the editor's save bursts.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg></div>
-            <h3>Multi-perfil</h3>
-            <p>Gestiona varios servidores, duplícalos con un clic y exporta/importa tu configuración cuando quieras.</p>
+            <h3>Multi-profile</h3>
+            <p>Manage several servers, duplicate them in one click and export/import your configuration any time.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
-            <h3>Verificación de host key</h3>
-            <p>Modelo TOFU con <span class="mono">known_hosts</span> propio: confirma la huella la primera vez y avisa si la clave del servidor cambia.</p>
+            <h3>Host key verification</h3>
+            <p>TOFU model with its own <span class="mono">known_hosts</span>: confirm the fingerprint the first time and get alerted if the server key changes.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
-            <h3>Explorador remoto</h3>
-            <p>Navega el árbol remoto, renombra y elimina, selecciona en lote y arrastra ficheros locales para subirlos.</p>
+            <h3>Remote explorer</h3>
+            <p>Browse the remote tree, rename and delete, multi-select, and drag local files in to upload them.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.5 21a2 2 0 0 0 3 0"/></svg></div>
-            <h3>Notificaciones nativas</h3>
-            <p>Avisos del sistema por perfil: solo errores, resumen por lote o todas las acciones. Tú eliges el ruido.</p>
+            <h3>Native notifications</h3>
+            <p>Per-profile system alerts: errors only, batch summary or every action. You decide the noise.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-            <h3>Segundo plano + bandeja</h3>
-            <p>Cierra la ventana y sigue vigilando desde la bandeja del sistema. Instancia única, sin duplicados.</p>
+            <h3>Background + tray</h3>
+            <p>Close the window and keep watching from the system tray. Single instance, no duplicates.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
-            <h3>Tema y idioma</h3>
-            <p>Claro/oscuro automático según el sistema (o forzado) y multiidioma español / inglés.</p>
+            <h3>Theme &amp; language</h3>
+            <p>Automatic light/dark based on the system (or forced), and Spanish / English UI.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7l-2 2M20 20h-7l2-2"/><path d="M4 9v11h11M20 15V4H9"/></svg></div>
-            <h3>Reglas finas</h3>
-            <p>Patrones <span class="mono">include</span>/<span class="mono">ignore</span>, modo espejo, carpetas vacías y borrado propagado.</p>
+            <h3>Fine-grained rules</h3>
+            <p><span class="mono">include</span>/<span class="mono">ignore</span> patterns, mirror mode, empty folders and propagated deletes.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
-            <h3>Clave o contraseña</h3>
-            <p>Autenticación por clave privada (con passphrase) o contraseña, con compatibilidad RSA moderna (rsa-sha2).</p>
+            <h3>Key or password</h3>
+            <p>Private-key (with passphrase) or password auth, with modern RSA support (rsa-sha2).</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- CAPTURAS -->
+    <!-- SCREENSHOTS -->
     <section id="capturas" style="padding-top: 0">
       <div class="wrap">
         <div class="sec-head reveal">
-          <span class="kicker">Capturas</span>
-          <h2>La app, por dentro.</h2>
+          <span class="kicker">Screenshots</span>
+          <h2>The app, up close.</h2>
         </div>
         <div class="shots">
-          <figure class="shot reveal"><img src="screenshots/perfil.png" alt="Edición de un perfil" loading="lazy" /><figcaption>Edición de un perfil</figcaption></figure>
-          <figure class="shot reveal"><img src="screenshots/explorador.png" alt="Explorador remoto" loading="lazy" /><figcaption>Explorador de ficheros remoto</figcaption></figure>
-          <figure class="shot reveal"><img src="screenshots/ajustes.png" alt="Pantalla de ajustes" loading="lazy" /><figcaption>Ajustes (tema, idioma, seguridad…)</figcaption></figure>
-          <figure class="shot reveal"><img src="screenshots/actividad.png" alt="Monitorización y actividad" loading="lazy" /><figcaption>Monitorización en segundo plano</figcaption></figure>
+          <figure class="shot reveal"><img src="../screenshots/perfil.png" alt="Profile editor" loading="lazy" /><figcaption>Profile editor</figcaption></figure>
+          <figure class="shot reveal"><img src="../screenshots/explorador.png" alt="Remote explorer" loading="lazy" /><figcaption>Remote file explorer</figcaption></figure>
+          <figure class="shot reveal"><img src="../screenshots/ajustes.png" alt="Settings" loading="lazy" /><figcaption>Settings (theme, language, security…)</figcaption></figure>
+          <figure class="shot reveal"><img src="../screenshots/actividad.png" alt="Monitoring and activity" loading="lazy" /><figcaption>Background monitoring</figcaption></figure>
         </div>
       </div>
     </section>
@@ -168,21 +168,21 @@
     <section id="how" style="padding-top: 0">
       <div class="wrap">
         <div class="sec-head reveal">
-          <span class="kicker">Cómo funciona</span>
-          <h2>De cero a sincronizando en un minuto.</h2>
+          <span class="kicker">How it works</span>
+          <h2>From zero to syncing in a minute.</h2>
         </div>
         <div class="steps">
           <div class="step reveal">
-            <h3>Crea un perfil</h3>
-            <p>Host, usuario y clave o contraseña. Elige la carpeta local y la ruta remota con el selector nativo.</p>
+            <h3>Create a profile</h3>
+            <p>Host, user and key or password. Pick the local folder and remote path with the native picker.</p>
           </div>
           <div class="step reveal">
-            <h3>Prueba la conexión</h3>
-            <p>Verifica la clave del servidor una vez. A partir de ahí, todo conecta sin fricción.</p>
+            <h3>Test the connection</h3>
+            <p>Verify the server key once. From then on, everything connects without friction.</p>
           </div>
           <div class="step reveal">
-            <h3>Activa el watcher</h3>
-            <p>Guarda en tu editor y los cambios viajan solos. Ciérrala a la bandeja y olvídate.</p>
+            <h3>Start the watcher</h3>
+            <p>Save in your editor and changes travel on their own. Close it to the tray and forget about it.</p>
           </div>
         </div>
       </div>
@@ -191,13 +191,13 @@
     <section>
       <div class="wrap split">
         <div class="reveal">
-          <span class="kicker">Control total</span>
-          <h2 style="font-size: clamp(28px, 3.6vw, 40px); margin-top: 12px">Configuración clara, por perfil.</h2>
+          <span class="kicker">Full control</span>
+          <h2 style="font-size: clamp(28px, 3.6vw, 40px); margin-top: 12px">Clear, per-profile configuration.</h2>
           <ul class="feature-list">
-            <li><span class="chk">✓</span><span><b>include / ignore</b> al estilo glob para subir justo lo que quieres.</span></li>
-            <li><span class="chk">✓</span><span><b>Modo espejo</b> para reflejar borrados en el remoto.</span></li>
-            <li><span class="chk">✓</span><span><b>autoDelete</b> y <b>carpetas vacías</b> configurables.</span></li>
-            <li><span class="chk">✓</span><span>Panel de <b>actividad, comandos y explorador</b> redimensionable.</span></li>
+            <li><span class="chk">✓</span><span><b>include / ignore</b> glob patterns to upload exactly what you want.</span></li>
+            <li><span class="chk">✓</span><span><b>Mirror mode</b> to reflect deletions on the remote.</span></li>
+            <li><span class="chk">✓</span><span>Configurable <b>autoDelete</b> and <b>empty folders</b>.</span></li>
+            <li><span class="chk">✓</span><span>Resizable <b>activity, commands and explorer</b> panel.</span></li>
           </ul>
         </div>
         <div class="code reveal">
@@ -210,7 +210,7 @@
 <span class="k">"include"</span>: [<span class="s">"**/*"</span>],
 <span class="k">"ignore"</span>: [<span class="s">".git"</span>, <span class="s">"node_modules/**"</span>],
 <span class="k">"uploadOnSave"</span>: <span class="s">true</span>,
-<span class="k">"autoDelete"</span>: <span class="s">false</span>   <span class="c">// modo espejo opcional</span></pre>
+<span class="k">"autoDelete"</span>: <span class="s">false</span>   <span class="c">// optional mirror mode</span></pre>
         </div>
       </div>
     </section>
@@ -219,14 +219,14 @@
       <div class="wrap">
         <div class="band reveal">
           <div>
-            <span class="kicker">Seguridad</span>
-            <h2 style="margin-top: 12px">Conexiones que puedes verificar.</h2>
-            <p>Núcleo en Rust puro (sin dependencias nativas en C), verificación de host key estilo OpenSSH y configuración que vive solo en tu equipo.</p>
+            <span class="kicker">Security</span>
+            <h2 style="margin-top: 12px">Connections you can verify.</h2>
+            <p>Pure-Rust core (no native C dependencies), OpenSSH-style host key verification and configuration that stays on your machine.</p>
           </div>
           <div class="kv">
-            <div><span class="t">SSH</span><span>SFTP sobre <b>russh</b>, con autenticación por clave o contraseña.</span></div>
-            <div><span class="t">TOFU</span><span>Huella SHA256 al confiar y alerta si la clave del servidor cambia.</span></div>
-            <div><span class="t">LOCAL</span><span>Sin telemetría. Tu configuración no sale de tu equipo.</span></div>
+            <div><span class="t">SSH</span><span>SFTP over <b>russh</b>, with key or password authentication.</span></div>
+            <div><span class="t">TOFU</span><span>SHA256 fingerprint on trust and an alert if the server key changes.</span></div>
+            <div><span class="t">LOCAL</span><span>No telemetry. Your configuration never leaves your machine.</span></div>
           </div>
         </div>
       </div>
@@ -235,29 +235,29 @@
     <section id="download" style="padding-top: 0">
       <div class="wrap">
         <div class="sec-head reveal" style="max-width: 720px">
-          <span class="kicker">Descargas</span>
-          <h2>Gratis para los tres sistemas.</h2>
-          <p>Elige tu plataforma. Cada release incluye los instaladores para todos los sistemas.</p>
+          <span class="kicker">Download</span>
+          <h2>Free for all three systems.</h2>
+          <p>Pick your platform. Every release includes installers for all systems.</p>
         </div>
         <div class="dl-grid">
           <div class="dl reveal" data-os="mac">
             <div class="os">macOS</div>
             <div class="files">.dmg · universal (Intel + Apple&nbsp;Silicon)</div>
-            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Descargar</a>
+            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Download</a>
           </div>
           <div class="dl reveal" data-os="win">
             <div class="os">Windows</div>
             <div class="files">.exe (setup) · .msi</div>
-            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Descargar</a>
+            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Download</a>
           </div>
           <div class="dl reveal" data-os="linux">
             <div class="os">Linux</div>
             <div class="files">.AppImage · .deb · .rpm</div>
-            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Descargar</a>
+            <a class="btn btn-primary" href="https://github.com/marcosesperon/sftp-sync/releases/latest" target="_blank" rel="noopener">Download</a>
           </div>
         </div>
         <div class="note reveal">
-          <b>Nota:</b> los binarios se distribuyen <b>sin firmar</b> (es una app gratuita). La primera vez, en macOS abre con <b>clic derecho → Abrir</b>; en Windows pulsa <b>"Más información → Ejecutar de todas formas"</b>. Instrucciones completas en el repositorio.
+          <b>Note:</b> binaries are distributed <b>unsigned</b> (this is a free app). The first time, on macOS open with <b>right-click → Open</b>; on Windows click <b>"More info → Run anyway"</b>. Full instructions in the repository.
         </div>
       </div>
     </section>
@@ -269,14 +269,14 @@
             <span class="glyph"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9h10l-3-3"/><path d="M16 15H6l3 3"/></svg></span>
             SFTP Sync
           </div>
-          Licencia MIT · por
+          MIT license · by
           <a href="https://github.com/marcosesperon" target="_blank" rel="noopener" style="color: var(--accent)">Marcos Esperón</a>
         </div>
         <div class="foot-links">
-          <a href="https://github.com/marcosesperon/sftp-sync" target="_blank" rel="noopener">Repositorio</a>
+          <a href="https://github.com/marcosesperon/sftp-sync" target="_blank" rel="noopener">Repository</a>
           <a href="https://github.com/marcosesperon/sftp-sync/releases" target="_blank" rel="noopener">Releases</a>
           <a href="https://github.com/marcosesperon/sftp-sync/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
-          <a class="bmc" href="https://buymeacoffee.com/marcosesperon" target="_blank" rel="noopener">☕ Hacer donación</a>
+          <a class="bmc" href="https://buymeacoffee.com/marcosesperon" target="_blank" rel="noopener">☕ Buy me a coffee</a>
         </div>
       </div>
     </footer>
@@ -298,7 +298,6 @@
         io.observe(el);
       });
 
-      // Oculta capturas que aún no existan; si no hay ninguna, oculta la sección.
       document.querySelectorAll("#capturas .shot img").forEach((img) => {
         img.addEventListener("error", () => {
           const fig = img.closest(".shot");
@@ -308,7 +307,6 @@
         });
       });
 
-      // Resalta la descarga del SO del visitante
       const p = navigator.platform.toLowerCase() + " " + navigator.userAgent.toLowerCase();
       const os = p.includes("mac") ? "mac" : p.includes("win") ? "win" : p.includes("linux") ? "linux" : null;
       if (os) {
