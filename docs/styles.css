@@ -131,6 +131,15 @@ nav {
 .nav-cta:hover {
   border-color: var(--accent);
 }
+.nav-bmc {
+  background: var(--warm);
+  color: #1a1300 !important;
+  border-color: transparent;
+}
+.nav-bmc:hover {
+  border-color: transparent;
+  filter: brightness(1.06);
+}
 .lang {
   display: flex;
   gap: 2px;
@@ -230,6 +239,21 @@ nav {
   margin-top: 16px;
   font-size: 13.5px;
   color: var(--muted);
+}
+.hero-author {
+  margin-top: 18px;
+  font-size: 14.5px;
+  color: var(--muted);
+}
+.hero-author strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.hero-author a {
+  color: var(--accent);
+}
+.hero-author a:hover {
+  text-decoration: underline;
 }
 
 /* App mockup */
