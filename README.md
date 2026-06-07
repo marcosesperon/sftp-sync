@@ -4,6 +4,8 @@
 
 Sube ficheros automáticamente al guardar (watcher), respeta patrones `ignore`, soporta múltiples perfiles y autenticación con clave privada o contraseña. Construida con **Tauri 2 + React** y un núcleo en **Rust puro** (sin dependencias nativas en C), lo que produce binarios pequeños y rápidos.
 
+🌐 **Web del proyecto:** [marcosesperon.github.io/sftp-sync](https://marcosesperon.github.io/sftp-sync/) · ⬇️ **[Descargas](https://github.com/marcosesperon/sftp-sync/releases/latest)**
+
 ## 📸 Capturas
 
 <table>
