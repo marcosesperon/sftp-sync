@@ -7,3 +7,4 @@
 ## Planes pendientes
 
 - [plan-keyring.md](plan-keyring.md) — plan diseñado para mover las credenciales al keychain del SO (`keyring`). Pendiente de implementar.
+- [plan-ftp.md](plan-ftp.md) — plan diseñado para añadir soporte FTP/FTPS (`suppaftp`). Pendiente de implementar.
