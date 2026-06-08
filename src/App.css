@@ -1001,10 +1001,57 @@ textarea {
 .logline.info {
   color: var(--muted);
 }
+.logtime {
+  color: #6b7178;
+}
 
 .placeholder {
   margin: auto;
   color: var(--muted);
+}
+
+/* Banner de actualización disponible */
+.update-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 8px 10px 8px 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  max-width: 92vw;
+}
+.update-banner button {
+  font: inherit;
+  font-size: 12.5px;
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+}
+.update-banner .ub-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06130f;
+  font-weight: 600;
+}
+.update-banner .ub-ghost {
+  color: var(--muted);
+}
+.update-banner .ub-x {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 6px;
 }
 
 .statusbar {

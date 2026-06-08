@@ -36,6 +36,7 @@ export interface Settings {
   autostartWatchers: boolean;
   launchAtLogin: boolean;
   verifyHostKey: boolean;
+  checkUpdates: boolean;
 }
 
 export interface SyncStats {
@@ -49,6 +50,8 @@ export interface LogEntry {
   profileId: string;
   level: "info" | "ok" | "error";
   message: string;
+  /** Hora de recepción (la añade el frontend al recibir el evento). */
+  time?: string;
 }
 
 export interface WatchState {

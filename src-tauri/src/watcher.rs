@@ -142,7 +142,10 @@ pub async fn run(app: AppHandle, profile: Profile) {
 
             let result = if is_file {
                 match std::fs::read(&path) {
-                    Ok(data) => c.upload(&remote, &data).await.map(|_| format!("↑ {rel}")),
+                    Ok(data) => c
+                        .upload(&remote, &data)
+                        .await
+                        .map(|_| format!("↑ {rel}  ({})", sync::human_size(data.len() as u64))),
                     Err(e) => Err(anyhow::anyhow!("lectura local {rel}: {e}")),
                 }
             } else if is_dir {

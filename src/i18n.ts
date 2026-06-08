@@ -118,6 +118,10 @@ const es: Dict = {
   "settings.importWarn": "Importar reemplaza todos los perfiles actuales.",
   "settings.security": "Seguridad",
   "settings.verifyHostKey": "Verificar la clave del servidor (known_hosts)",
+  "settings.checkUpdates": "Buscar actualizaciones al iniciar",
+  "update.available": "Nueva versión {v} disponible",
+  "update.download": "Descargar",
+  "update.skip": "Omitir",
   // Verificación de host key
   "hostkey.title": "Clave del servidor",
   "hostkey.unknown":
@@ -235,6 +239,10 @@ const en: Dict = {
   "settings.importWarn": "Importing replaces all current profiles.",
   "settings.security": "Security",
   "settings.verifyHostKey": "Verify server host key (known_hosts)",
+  "settings.checkUpdates": "Check for updates on launch",
+  "update.available": "Version {v} available",
+  "update.download": "Download",
+  "update.skip": "Skip",
   "hostkey.title": "Server host key",
   "hostkey.unknown":
     "The server presents an unrecognized key. Verify the SHA256 fingerprint before trusting it:",

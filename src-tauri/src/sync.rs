@@ -35,6 +35,21 @@ pub fn rel_posix(local_root: &Path, path: &Path) -> Option<String> {
     }
 }
 
+/// Tamaño de fichero legible (B/KB/MB/GB).
+pub fn human_size(bytes: u64) -> String {
+    const K: f64 = 1024.0;
+    let b = bytes as f64;
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if b < K * K {
+        format!("{:.1} KB", b / K)
+    } else if b < K * K * K {
+        format!("{:.1} MB", b / (K * K))
+    } else {
+        format!("{:.1} GB", b / (K * K * K))
+    }
+}
+
 /// Une la raíz remota con una ruta relativa POSIX, normalizando barras.
 pub fn remote_join(remote_root: &str, rel_posix: &str) -> String {
     let root = remote_root.trim_end_matches('/');
@@ -102,7 +117,7 @@ pub async fn sync_all<F: Fn(&str)>(
             Ok(data) => match conn.upload(&remote, &data).await {
                 Ok(_) => {
                     stats.uploaded += 1;
-                    log(&format!("↑ {rel}"));
+                    log(&format!("↑ {rel}  ({})", human_size(data.len() as u64)));
                 }
                 Err(e) => {
                     stats.errors += 1;

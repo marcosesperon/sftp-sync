@@ -9,6 +9,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
 import {
   isPermissionGranted,
   requestPermission,
@@ -82,7 +83,22 @@ const DEFAULT_SETTINGS: Settings = {
   autostartWatchers: false,
   launchAtLogin: false,
   verifyHostKey: true,
+  checkUpdates: true,
 };
+
+const REPO = "marcosesperon/sftp-sync";
+
+// Compara versiones semver simples: ¿`a` es más nueva que `b`?
+function isNewer(a: string, b: string): boolean {
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
 
 // Aplica el tema visual a la ventana y al documento.
 async function applyTheme(theme: Settings["theme"]) {
@@ -121,6 +137,10 @@ function App() {
   const [hostKeyPrompt, setHostKeyPrompt] = useState<{
     fingerprint: string;
     changed: boolean;
+  } | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<{
+    version: string;
+    url: string;
   } | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [explorerPath, setExplorerPath] = useState<string>("");
@@ -256,6 +276,7 @@ function App() {
         const s = await call<Settings>("load_settings");
         setSettings(s);
         applyTheme(s.theme);
+        if (s.checkUpdates !== false) checkForUpdates();
       } catch {
         applyTheme("system");
       }
@@ -266,7 +287,8 @@ function App() {
   // Suscripción a eventos del backend.
   useEffect(() => {
     const unlistenLog = listen<LogEntry>("sftp-log", (ev) => {
-      setLogs((prev) => [...prev.slice(-499), ev.payload]);
+      const entry = { ...ev.payload, time: new Date().toLocaleTimeString() };
+      setLogs((prev) => [...prev.slice(-499), entry]);
       if (
         logTabRef.current === "explorer" &&
         ev.payload.level === "ok" &&
@@ -651,6 +673,29 @@ function App() {
     }
   }
 
+  // Consulta la última release de GitHub y avisa si hay versión nueva.
+  async function checkForUpdates() {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${REPO}/releases/latest`,
+        { headers: { Accept: "application/vnd.github+json" } }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const latest = String(data.tag_name || "").replace(/^v/, "");
+      const current = await getVersion();
+      const skipped = localStorage.getItem("skipUpdate");
+      if (latest && isNewer(latest, current) && latest !== skipped) {
+        setUpdateInfo({
+          version: latest,
+          url: data.html_url || `https://github.com/${REPO}/releases/latest`,
+        });
+      }
+    } catch {
+      /* sin conexión o API no disponible: se ignora silenciosamente */
+    }
+  }
+
   async function exportConfig() {
     const path = await saveDialog({
       defaultPath: "sftp-sync-profiles.json",
@@ -729,7 +774,7 @@ function App() {
         <div className="log-body">
           {profileLogs.map((l, i) => (
             <div key={i} className={`logline ${l.level}`}>
-              {l.message}
+              {l.time && <span className="logtime">{l.time}</span>} {l.message}
             </div>
           ))}
           <div ref={logEndRef} />
@@ -807,6 +852,30 @@ function App() {
 
   return (
     <div className="app">
+      {updateInfo && (
+        <div className="update-banner">
+          <span>🎉 {t("update.available", { v: updateInfo.version })}</span>
+          <button className="ub-primary" onClick={() => openUrl(updateInfo.url)}>
+            {t("update.download")}
+          </button>
+          <button
+            className="ub-ghost"
+            onClick={() => {
+              localStorage.setItem("skipUpdate", updateInfo.version);
+              setUpdateInfo(null);
+            }}
+          >
+            {t("update.skip")}
+          </button>
+          <button
+            className="ub-x"
+            onClick={() => setUpdateInfo(null)}
+            aria-label="cerrar"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <aside className="sidebar">
         <div className="sidebar-head">
           <span>{t("sidebar.profiles")}</span>
@@ -1240,7 +1309,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="about-title">SFTP Sync</h2>
-            <p className="about-version">v0.3.0</p>
+            <p className="about-version">v0.4.0</p>
             <div className="about-author">
               <div className="about-name">Marcos Esperón</div>
               <button
@@ -1343,6 +1412,16 @@ function App() {
                   }
                 />
                 {t("settings.launchAtLogin")}
+              </label>
+              <label className="settings-check">
+                <input
+                  type="checkbox"
+                  checked={settings.checkUpdates}
+                  onChange={(e) =>
+                    saveSettings({ checkUpdates: e.target.checked })
+                  }
+                />
+                {t("settings.checkUpdates")}
               </label>
             </div>
 

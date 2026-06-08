@@ -21,6 +21,8 @@ pub struct Settings {
     pub launch_at_login: bool,
     /// Verificar la clave del servidor contra known_hosts (TOFU).
     pub verify_host_key: bool,
+    /// Buscar versiones nuevas en GitHub al iniciar.
+    pub check_updates: bool,
 }
 
 impl Default for Settings {
@@ -33,6 +35,7 @@ impl Default for Settings {
             autostart_watchers: false,
             launch_at_login: false,
             verify_host_key: true,
+            check_updates: true,
         }
     }
 }

@@ -4,6 +4,15 @@ Todas las novedades notables de este proyecto se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.4.0] - 2026-06-07
+
+### Añadido
+- **Aviso de nueva versión** al iniciar: consulta las releases de GitHub y, si hay una más reciente, muestra un banner con enlace de descarga y opción de omitirla. Configurable en *Ajustes → Ventana y arranque*.
+- El panel de **Actividad** ahora muestra la **hora** y el **tamaño** de cada fichero subido.
+
+### Proyecto
+- Web de presentación bilingüe (español / inglés) publicada con **GitHub Pages**: [marcosesperon.github.io/sftp-sync](https://marcosesperon.github.io/sftp-sync/).
+
 ## [0.3.0] - 2026-06-06
 
 ### Añadido
