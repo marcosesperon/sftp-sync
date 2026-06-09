@@ -5,7 +5,8 @@
 
 use notify::RecursiveMode;
 use notify_debouncer_full::{new_debouncer, DebounceEventResult};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::time::Duration;
 use tauri::AppHandle;
@@ -77,6 +78,9 @@ pub async fn run(app: AppHandle, profile: Profile) {
 
     // Conexión perezosa y reutilizada entre eventos.
     let mut conn: Option<SftpConnection> = None;
+    // Hash del contenido de cada fichero ya subido en esta sesión de vigilancia.
+    // Permite omitir guardados que no cambian el contenido (evita resubir lo mismo).
+    let mut hashes: HashMap<PathBuf, u64> = HashMap::new();
 
     while let Some(res) = rx.recv().await {
         let events_batch = match res {
@@ -127,6 +131,36 @@ pub async fn run(app: AppHandle, profile: Profile) {
                 continue;
             }
 
+            // Para ficheros: lee el contenido y compara su hash. Si no ha cambiado
+            // respecto a la última subida de esta sesión, se omite por completo
+            // (sin conectar, sin subir y sin registrarlo en la actividad).
+            let file_data: Option<(Vec<u8>, u64)> = if is_file {
+                match std::fs::read(&path) {
+                    Ok(data) => {
+                        let h = hash_bytes(&data);
+                        if hashes.get(&path) == Some(&h) {
+                            continue; // contenido idéntico → omitir
+                        }
+                        Some((data, h))
+                    }
+                    Err(e) => {
+                        batch.errors += 1;
+                        if batch.first_errors.len() < 3 {
+                            batch.first_errors.push(rel.clone());
+                        }
+                        events::log(
+                            &app,
+                            &profile.id,
+                            "error",
+                            format!("✗ {rel} (lectura local): {e}"),
+                        );
+                        continue;
+                    }
+                }
+            } else {
+                None
+            };
+
             // Garantiza una conexión viva antes de operar.
             if conn.is_none() {
                 match SftpConnection::connect(&profile, commands::host_key_mode(&app)).await {
@@ -141,13 +175,10 @@ pub async fn run(app: AppHandle, profile: Profile) {
             let remote = sync::remote_join(&profile.remote_path, &rel);
 
             let result = if is_file {
-                match std::fs::read(&path) {
-                    Ok(data) => c
-                        .upload(&remote, &data)
-                        .await
-                        .map(|_| format!("↑ {rel}  ({})", sync::human_size(data.len() as u64))),
-                    Err(e) => Err(anyhow::anyhow!("lectura local {rel}: {e}")),
-                }
+                let (data, _) = file_data.as_ref().unwrap();
+                c.upload(&remote, data)
+                    .await
+                    .map(|_| format!("↑ {rel}  ({})", sync::human_size(data.len() as u64)))
             } else if is_dir {
                 // Directorio creado/modificado y la opción de carpetas está activa.
                 c.ensure_dir(&remote).await.map(|_| format!("📁 {rel}"))
@@ -158,11 +189,15 @@ pub async fn run(app: AppHandle, profile: Profile) {
 
             match result {
                 Ok(msg) => {
-                    // Contadores para el resumen.
+                    // Contadores para el resumen + registro del hash subido.
                     if is_file {
                         batch.uploaded += 1;
+                        if let Some((_, h)) = &file_data {
+                            hashes.insert(path.clone(), *h);
+                        }
                     } else if removed {
                         batch.deleted += 1;
+                        hashes.remove(&path);
                     }
                     // Modo "Todas": una notificación por acción, con tope anti-spam.
                     if profile.notify == NotifyMode::All {
@@ -193,4 +228,11 @@ pub async fn run(app: AppHandle, profile: Profile) {
     }
 
     events::watch_state(&app, &profile.id, false);
+}
+
+/// Hash rápido del contenido de un fichero (para detectar cambios reales).
+fn hash_bytes(data: &[u8]) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    data.hash(&mut h);
+    h.finish()
 }

@@ -67,6 +67,15 @@ function formatDate(mtime: number | null): string {
   )}:${p(d.getMinutes())}`;
 }
 
+// Separa de un mensaje de actividad el tamaño final "(12.1 KB)" si lo hay,
+// para mostrarlo en una columna a la derecha y sin paréntesis.
+const SIZE_RE = /^(.*?)\s*\((\d[\d.,]*\s?(?:B|KB|MB|GB))\)\s*$/;
+function splitLogMessage(message: string): { body: string; size: string } {
+  const m = message.match(SIZE_RE);
+  if (m) return { body: m[1], size: m[2] };
+  return { body: message, size: "" };
+}
+
 // Resumen legible del resultado de un comando.
 function summarizeResult(res: unknown): string {
   if (res === null || res === undefined) return "ok";
@@ -121,6 +130,7 @@ function App() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [watching, setWatching] = useState<Set<string>>(new Set());
+  const [startingWatch, setStartingWatch] = useState<Set<string>>(new Set());
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [status, setStatus] = useState<string>("");
   const [testing, setTesting] = useState(false);
@@ -306,6 +316,13 @@ function App() {
         const next = new Set(prev);
         if (ev.payload.watching) next.add(ev.payload.profileId);
         else next.delete(ev.payload.profileId);
+        return next;
+      });
+      // El watcher ya respondió (activo o no): deja de estar "iniciando".
+      setStartingWatch((prev) => {
+        if (!prev.has(ev.payload.profileId)) return prev;
+        const next = new Set(prev);
+        next.delete(ev.payload.profileId);
         return next;
       });
     });
@@ -647,14 +664,28 @@ function App() {
 
   async function toggleWatch() {
     if (!selected) return;
+    const id = selected.id;
     await persist(profiles);
     try {
-      if (watching.has(selected.id)) {
-        await call("stop_watch", { profileId: selected.id });
+      if (watching.has(id)) {
+        await call("stop_watch", { profileId: id });
         setStatus(t("status.watchStopped"));
       } else {
-        await call("start_watch", { profile: selected });
-        setStatus(t("status.watchStarted"));
+        // Marca "iniciando" hasta que llegue el evento de estado del watcher
+        // (puede tardar al establecer la vigilancia de árboles grandes o de red).
+        setStartingWatch((prev) => new Set(prev).add(id));
+        setStatus(t("status.watchStarting"));
+        try {
+          await call("start_watch", { profile: selected });
+          setStatus(t("status.watchStarted"));
+        } catch (e) {
+          setStartingWatch((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+          setStatus(`✗ ${e}`);
+        }
       }
     } catch (e) {
       setStatus(`✗ ${e}`);
@@ -772,11 +803,18 @@ function App() {
       </div>
       {logTab === "activity" ? (
         <div className="log-body">
-          {profileLogs.map((l, i) => (
-            <div key={i} className={`logline ${l.level}`}>
-              {l.time && <span className="logtime">{l.time}</span>} {l.message}
-            </div>
-          ))}
+          {profileLogs.map((l, i) => {
+            const { body, size } = splitLogMessage(l.message);
+            return (
+              <div key={i} className={`logline act ${l.level}`}>
+                {l.time && <span className="logtime">{l.time}</span>}
+                <span className="logmsg" title={body}>
+                  {body}
+                </span>
+                {size && <span className="logsize">{size}</span>}
+              </div>
+            );
+          })}
           <div ref={logEndRef} />
         </div>
       ) : logTab === "commands" ? (
@@ -894,7 +932,15 @@ function App() {
               className={p.id === selectedId ? "active" : ""}
               onClick={() => setSelectedId(p.id)}
             >
-              <span className={`dot ${watching.has(p.id) ? "on" : ""}`} />
+              <span
+                className={`dot ${
+                  watching.has(p.id)
+                    ? "on"
+                    : startingWatch.has(p.id)
+                    ? "starting"
+                    : ""
+                }`}
+              />
               <span className="pname">{p.name || t("sidebar.unnamed")}</span>
               <button
                 className="dup"
@@ -1271,11 +1317,20 @@ function App() {
                           watching.has(selected.id) ? "danger" : "primary"
                         }
                         onClick={toggleWatch}
-                        disabled={!watching.has(selected.id) && !canSync}
+                        disabled={
+                          startingWatch.has(selected.id) ||
+                          (!watching.has(selected.id) && !canSync)
+                        }
                       >
-                        {watching.has(selected.id)
-                          ? t("watch.stop")
-                          : t("watch.start")}
+                        {startingWatch.has(selected.id) ? (
+                          <>
+                            <span className="spinner" /> {t("watch.starting")}
+                          </>
+                        ) : watching.has(selected.id) ? (
+                          t("watch.stop")
+                        ) : (
+                          t("watch.start")
+                        )}
                       </button>
                       <button
                         className="ghost"
@@ -1309,7 +1364,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="about-title">SFTP Sync</h2>
-            <p className="about-version">v0.4.0</p>
+            <p className="about-version">v0.4.1</p>
             <div className="about-author">
               <div className="about-name">Marcos Esperón</div>
               <button

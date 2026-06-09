@@ -18,6 +18,8 @@ const es: Dict = {
   // Watcher
   "watch.stop": "Detener watcher",
   "watch.start": "Iniciar watcher",
+  "watch.starting": "Iniciando…",
+  "status.watchStarting": "Iniciando watcher…",
   // Campos
   "field.profileName": "Nombre del perfil",
   "section.connection": "Datos de conexión",
@@ -146,6 +148,8 @@ const en: Dict = {
   "bmc.label": "Buy me a coffee",
   "watch.stop": "Stop watcher",
   "watch.start": "Start watcher",
+  "watch.starting": "Starting…",
+  "status.watchStarting": "Starting watcher…",
   "field.profileName": "Profile name",
   "section.connection": "Connection",
   "section.sync": "Sync mode",

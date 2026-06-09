@@ -4,6 +4,13 @@ Todas las novedades notables de este proyecto se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.4.1] - 2026-06-07
+
+### Mejorado
+- El watcher **omite los ficheros sin cambios reales** (compara un hash del contenido), evitando subidas y entradas de actividad duplicadas por los guardados del editor.
+- Indicador **"Iniciando…"** con spinner al arrancar el watcher, mientras se establece la vigilancia (útil con carpetas grandes o unidades de red).
+- Panel de **Actividad**: el **tamaño** se muestra alineado a la derecha y sin paréntesis, y la ruta se **trunca con …** si no cabe (ruta completa en el tooltip).
+
 ## [0.4.0] - 2026-06-07
 
 ### Añadido

@@ -1,6 +1,6 @@
 [package]
 name = "sftp-sync"
-version = "0.4.0"
+version = "0.4.1"
 description = "GUI multiplataforma de sincronización SFTP (alternativa nativa a la extensión SFTP de VS Code)"
 authors = ["Marcos Esperón"]
 edition = "2021"

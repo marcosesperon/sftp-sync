@@ -429,6 +429,36 @@ body {
   background: var(--ok);
   box-shadow: 0 0 6px var(--ok);
 }
+.dot.starting {
+  background: #e2b341;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Spinner para el botón "Iniciando…" */
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* Main */
 .main {
@@ -1003,6 +1033,25 @@ textarea {
 }
 .logtime {
   color: #6b7178;
+}
+
+/* Líneas del panel Actividad: hora · mensaje (truncable) · tamaño a la derecha */
+.logline.act {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.logline.act .logmsg {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logline.act .logsize {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--muted);
 }
 
 .placeholder {
