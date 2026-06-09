@@ -22,6 +22,7 @@ export interface Profile {
   syncEmptyDirs: boolean;
   mirrorDelete: boolean;
   notify: NotifyMode;
+  errorSound: boolean;
 }
 
 export interface Config {
@@ -95,5 +96,6 @@ export function newProfile(): Profile {
     syncEmptyDirs: false,
     mirrorDelete: false,
     notify: "errors",
+    errorSound: false,
   };
 }

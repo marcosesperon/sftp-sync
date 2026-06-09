@@ -225,6 +225,10 @@ pub async fn run(app: AppHandle, profile: Profile) {
         // Cierre del lote: notificaciones de resumen/errores (y "y N más" en modo Todas).
         notifications::notify_all_overflow(&app, &profile, all_overflow);
         notifications::maybe_notify(&app, &profile, &batch);
+        // Sonido de error del sistema si falló alguna subida y la opción está activa.
+        if profile.error_sound && batch.errors > 0 {
+            notifications::play_error_sound();
+        }
     }
 
     events::watch_state(&app, &profile.id, false);

@@ -93,6 +93,41 @@ pub fn notify_all_overflow(app: &AppHandle, profile: &Profile, extra: usize) {
     }
 }
 
+/// Reproduce el sonido de error del sistema (best-effort, no bloquea).
+pub fn play_error_sound() {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("afplay")
+            .arg("/System/Library/Sounds/Basso.aiff")
+            .spawn();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let _ = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "[System.Media.SystemSounds]::Hand.Play()",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if std::process::Command::new("canberra-gtk-play")
+            .args(["-i", "dialog-error"])
+            .spawn()
+            .is_err()
+        {
+            let _ = std::process::Command::new("paplay")
+                .arg("/usr/share/sounds/freedesktop/stereo/dialog-error.oga")
+                .spawn();
+        }
+    }
+}
+
 fn send(app: &AppHandle, profile: &Profile, body: &str) {
     // `show()` no falla aunque el permiso esté denegado: simplemente no aparece.
     let _ = app

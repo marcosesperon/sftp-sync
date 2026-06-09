@@ -48,6 +48,7 @@ const es: Dict = {
   "notify.errors": "Solo errores",
   "notify.summary": "Resumen",
   "notify.all": "Todas",
+  "check.errorSound": "Reproducir el sonido de error del sistema si falla una subida (watcher)",
   // Acciones
   "action.testing": "Probando conexión…",
   "action.cancelTest": "Cancelar prueba de conexión",
@@ -177,6 +178,7 @@ const en: Dict = {
   "notify.errors": "Errors only",
   "notify.summary": "Summary",
   "notify.all": "All",
+  "check.errorSound": "Play the system error sound if an upload fails (watcher)",
   "action.testing": "Testing connection…",
   "action.cancelTest": "Cancel connection test",
   "action.syncing": "Syncing…",

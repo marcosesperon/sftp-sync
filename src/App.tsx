@@ -1280,6 +1280,18 @@ function App() {
                           </label>
                         ))}
                       </div>
+                      <div className="checks" style={{ marginTop: "16px" }}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={selected.errorSound}
+                            onChange={(e) =>
+                              update({ errorSound: e.target.checked })
+                            }
+                          />
+                          {t("check.errorSound")}
+                        </label>
+                      </div>
                     </section>
                     )}
                   </fieldset>
