@@ -4,9 +4,10 @@ App de escritorio multiplataforma (macOS/Windows/Linux) para **sincronización S
 alternativa nativa e independiente del editor. **Tauri 2 + React (TS)** en el frontend
 y un **núcleo en Rust puro** (sin dependencias nativas en C).
 
-- **Versión publicada:** 0.4.0. Repo: github.com/marcosesperon/sftp-sync. Licencia: **MIT**.
+- **Versión publicada:** 0.4.1. Repo: github.com/marcosesperon/sftp-sync. Licencia: **MIT**.
 - **Web (GitHub Pages):** https://marcosesperon.github.io/sftp-sync/ (servida desde `/docs`, ES + `/en/`).
-- **Pendiente de commit** (para una próxima 0.4.x): dedup por hash en el watcher + indicador "Iniciando…" del botón de watcher (ver más abajo).
+- **v0.4.1:** dedup por hash en el watcher, indicador "Iniciando…" del botón de watcher, y panel de
+  Actividad con tamaño alineado a la derecha (sin paréntesis) y ruta truncada con `…`.
 
 ## Stack
 
