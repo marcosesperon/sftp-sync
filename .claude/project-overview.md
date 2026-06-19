@@ -117,6 +117,15 @@ Notas: si `tauri dev` deja un Vite huérfano en 1420, matarlo antes de relanzar
 empaquetado. `screencapture` no funciona desde el shell del agente (sin permiso de grabación).
 
 ## Flujo de release
+- **ANTES de lanzar cada release, limpiar el almacenamiento de Actions** (plan gratuito: 500 MB
+  de artifacts/logs + 10 GB de caches). Los builds de release dejan caches de Rust de ~600 MB por SO
+  (~1,8 GB en total) que NO se reutilizan en la versión siguiente (la clave cambia con `Cargo.lock`).
+  Borrar caches y artifacts caducados para no agotar la cuota:
+  ```bash
+  for id in $(gh api repos/marcosesperon/sftp-sync/actions/caches --paginate -q '.actions_caches[].id'); do gh api -X DELETE repos/marcosesperon/sftp-sync/actions/caches/$id; done
+  for id in $(gh api repos/marcosesperon/sftp-sync/actions/artifacts --paginate -q '.artifacts[].id'); do gh api -X DELETE repos/marcosesperon/sftp-sync/actions/artifacts/$id; done
+  ```
+  (El contador del billing va con retraso; se promedia y se resetea cada ciclo.)
 - Workflow `release.yml` (tauri-action) compila macOS (universal), Windows y Linux al pushear tag `v*`.
   El token de gh necesita scope `workflow`. Notas tomadas de `CHANGELOG.md` vía `scripts/changelog.mjs`.
 - Para publicar: añadir sección a `CHANGELOG.md`; subir versión en `package.json`,
