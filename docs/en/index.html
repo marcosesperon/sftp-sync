@@ -6,7 +6,7 @@
     <title>SFTP Sync — native, cross-platform desktop SFTP sync</title>
     <meta
       name="description"
-      content="Desktop GUI (macOS · Windows · Linux) for SFTP sync: upload on save, multi-profile, remote explorer, host key verification. Built with Tauri + Rust."
+      content="Desktop GUI (macOS · Windows · Linux) for SFTP sync: upload on save, multi-profile, remote explorer, built-in SSH terminal, host key verification. Built with Tauri + Rust."
     />
     <link rel="icon" href="../icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -73,7 +73,7 @@
           </div>
           <div class="mock-log">
             <div style="margin-bottom: 8px">
-              <span class="tab">Activity</span><span class="tab off">Commands</span><span class="tab off">Explorer</span>
+              <span class="tab">Activity</span><span class="tab off">Commands</span><span class="tab off">Explorer</span><span class="tab off">SSH</span>
             </div>
             <div class="logline"><span class="up">↑</span> <span class="path">src/index.php</span></div>
             <div class="logline"><span class="up">↑</span> <span class="path">assets/app.css</span></div>
@@ -121,6 +121,11 @@
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
             <h3>Remote explorer</h3>
             <p>Browse the remote tree, rename and delete, multi-select, and drag local files in to upload them.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></svg></div>
+            <h3>SSH connection</h3>
+            <p>Open an SSH terminal with the profile credentials: built into the app (multi-session), in the system terminal, or with PuTTY on Windows.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.5 21a2 2 0 0 0 3 0"/></svg></div>

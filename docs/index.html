@@ -6,7 +6,7 @@
     <title>SFTP Sync — sincronización SFTP de escritorio, nativa y multiplataforma</title>
     <meta
       name="description"
-      content="GUI de escritorio (macOS · Windows · Linux) para sincronización SFTP: sube al guardar, multi-perfil, explorador remoto, verificación de host key. Tauri + Rust."
+      content="GUI de escritorio (macOS · Windows · Linux) para sincronización SFTP: sube al guardar, multi-perfil, explorador remoto, terminal SSH integrada, verificación de host key. Tauri + Rust."
     />
     <link rel="icon" href="icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -73,7 +73,7 @@
           </div>
           <div class="mock-log">
             <div style="margin-bottom: 8px">
-              <span class="tab">Actividad</span><span class="tab off">Comandos</span><span class="tab off">Explorador</span>
+              <span class="tab">Actividad</span><span class="tab off">Comandos</span><span class="tab off">Explorador</span><span class="tab off">SSH</span>
             </div>
             <div class="logline"><span class="up">↑</span> <span class="path">src/index.php</span></div>
             <div class="logline"><span class="up">↑</span> <span class="path">assets/app.css</span></div>
@@ -121,6 +121,11 @@
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
             <h3>Explorador remoto</h3>
             <p>Navega el árbol remoto, renombra y elimina, selecciona en lote y arrastra ficheros locales para subirlos.</p>
+          </div>
+          <div class="card reveal">
+            <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></svg></div>
+            <h3>Conexión SSH</h3>
+            <p>Abre una terminal SSH con las credenciales del perfil: integrada en la app (multisesión), en la terminal del sistema o con PuTTY en Windows.</p>
           </div>
           <div class="card reveal">
             <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.5 21a2 2 0 0 0 3 0"/></svg></div>
