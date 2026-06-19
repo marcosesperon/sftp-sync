@@ -170,6 +170,99 @@ body {
   text-align: center;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
+/* Terminal SSH integrada (pestaña del panel) */
+.log-body.ssh-layer {
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.ssh-pane {
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.ssh-error {
+  padding: 8px 12px;
+  color: var(--danger, #f85149);
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ssh-term-host {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 8px;
+}
+.ssh-term-host .xterm {
+  height: 100%;
+}
+
+/* Selector de sesiones SSH (menú desplegable de la pestaña) */
+.tab-ssh {
+  position: relative;
+  display: inline-flex;
+}
+.ssh-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  min-width: 200px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+}
+.ssh-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ssh-menu-item:hover {
+  background: var(--panel-2);
+}
+.ssh-menu-item.on {
+  background: var(--accent, #2563eb);
+  color: #fff;
+}
+.ssh-menu-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.ssh-menu-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ssh-menu-sub {
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ssh-menu-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.7;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.ssh-menu-close:hover {
+  opacity: 1;
+  background: rgba(127, 127, 127, 0.25);
+}
+
 .about-title {
   margin: 0;
   font-size: 22px;

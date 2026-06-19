@@ -62,6 +62,12 @@ Sincroniza una carpeta local con un servidor por SFTP, subiendo los cambios auto
 - **Conexión SFTP persistente** durante el watcher, con reconexión automática, para que cada subida no pague el coste del *handshake*.
 - Ambas operaciones (prueba de conexión y sincronización) son **cancelables** desde la UI: si el servidor tarda o se cuelga, un botón aborta la operación de verdad y restablece la edición.
 
+### Conexión SSH (terminal)
+Además de la sincronización, cada perfil ofrece un botón **Conectar por SSH** que reutiliza sus credenciales. El modo se elige en *Ajustes → SSH*:
+- **Terminal integrada** (por defecto): abre una sesión SSH interactiva en una **pestaña dentro de la app** (xterm.js + `russh`), con la misma autenticación y verificación de host key del perfil. Admite **varias sesiones simultáneas** —contador en la pestaña y menú para alternar entre ellas, incluso del mismo perfil— y la sesión **sigue viva** al cambiar de pestaña o activar el watcher.
+- **Terminal del sistema**: lanza el `ssh` del sistema en la terminal nativa (iTerm2 o Terminal.app en macOS, Windows Terminal/`cmd` en Windows, emuladores comunes en Linux). Con autenticación por contraseña, la pide la propia terminal; usa el `known_hosts` del sistema.
+- **PuTTY** (solo Windows): abre PuTTY con autodetección del ejecutable (ruta configurable). Con contraseña se inyecta automáticamente; con clave, se indica una clave **`.ppk`** en el perfil.
+
 ### Opciones por perfil
 | Opción | Descripción |
 |---|---|
@@ -72,6 +78,8 @@ Sincroniza una carpeta local con un servidor por SFTP, subiendo los cambios auto
 | **Patrones `include`** | Qué ficheros sincronizar (estilo glob). Por defecto `**/*` (todo). Útil para subir solo ciertos tipos: p. ej. `*.php`, `*.js`. Un patrón sin barra (`*.php`) casa a cualquier profundidad. |
 | **Patrones `ignore`** | Lista de patrones a excluir, estilo glob/gitignore (`.git`, `.vscode`, `.DS_Store`, `node_modules/**`, …). Se aplica **después** de `include`. |
 | **Notificaciones** | Notificaciones nativas del sistema: `Ninguna` · `Solo errores` · `Resumen` (una por ráfaga del watcher / por sync) · `Todas` (una por acción, con tope anti-spam). |
+| **Sonido de error** | Reproduce el sonido de error del sistema si falla una subida con el watcher iniciado. |
+| **Clave `.ppk` (PuTTY)** | Ruta a la clave en formato PuTTY, usada solo en el modo de conexión SSH con PuTTY (Windows). |
 
 ### Interfaz
 - **Gestión de múltiples perfiles** con barra lateral; indicador verde de qué perfiles tienen el watcher activo.
@@ -84,7 +92,7 @@ Sincroniza una carpeta local con un servidor por SFTP, subiendo los cambios auto
   - **Explorador** — navegación del árbol remoto vía SFTP: entrar en carpetas, columnas de permisos/fecha/tamaño, **menú contextual** (renombrar/eliminar), **selección múltiple** y **arrastrar ficheros locales** para subirlos.
 - **Icono en la bandeja del sistema:** al cerrar la ventana, la app **se minimiza a la bandeja y sigue vigilando en segundo plano**. Clic en el icono (o en el Dock en macOS) reabre la ventana. **Instancia única**.
 - **Tema claro/oscuro** automático según el sistema (o forzado), y **multiidioma** (español / inglés).
-- **Pantalla de ajustes** con: idioma, tema, mostrar/ocultar en Dock (macOS) y bandeja, iniciar watchers al abrir la app, abrir al iniciar el ordenador, verificación de host key e **importar/exportar** la configuración de perfiles.
+- **Pantalla de ajustes** con: idioma, tema, mostrar/ocultar en Dock (macOS) y bandeja, iniciar watchers al abrir la app, abrir al iniciar el ordenador, verificación de host key, **modo de conexión SSH** (integrada / terminal del sistema / PuTTY) e **importar/exportar** la configuración de perfiles.
 - **Menú contextual del navegador desactivado** (salvo en campos de texto) y **selección de texto** limitada a los campos.
 
 ### Descargas
@@ -125,6 +133,7 @@ Los binarios se generan automáticamente y **no están firmados ni notarizados**
 | Shell de escritorio | [Tauri 2](https://tauri.app) |
 | Frontend | React 19 + TypeScript + [Vite](https://vite.dev) |
 | SSH / SFTP | [`russh`](https://crates.io/crates/russh) `0.54` · [`russh-sftp`](https://crates.io/crates/russh-sftp) `2` |
+| Terminal integrada | [`xterm.js`](https://xtermjs.org) (`@xterm/xterm` + `addon-fit`) sobre una shell `russh` con PTY |
 | File watching | [`notify`](https://crates.io/crates/notify) `8` + `notify-debouncer-full` |
 | Patrones glob | [`globset`](https://crates.io/crates/globset) |
 | Plugins Tauri | dialog · notification · opener · autostart · single-instance |
@@ -210,6 +219,7 @@ src/                       Frontend React
   types.ts                 Tipos espejo del modelo Rust
   i18n.ts                  Diccionarios es/en + t()
   App.tsx                  UI: perfiles, edición, monitorización, logs, explorador, ajustes
+  useSshSession.ts         Hook de las terminales SSH integradas (xterm.js, multisesión)
   App.css                  Estilos (temas claro/oscuro)
   main.tsx                 Entry point (desactiva el menú contextual)
 src-tauri/src/
@@ -217,6 +227,8 @@ src-tauri/src/
   settings.rs              Ajustes globales + persistencia
   ignore.rs                Compilación de patrones include/ignore a GlobSet
   sftp.rs                  Conexión russh + verificación de host key + operaciones SFTP
+  ssh_shell.rs             Shell SSH interactiva (PTY) para la terminal integrada
+  system_terminal.rs       Apertura de SSH en terminal del sistema o PuTTY
   sync.rs                  Mapeo local→remoto, sync completa y modo espejo
   watcher.rs               Watcher notify con debounce, reconexión y manejo de carpetas
   notifications.rs         Notificaciones nativas por modo
@@ -225,7 +237,7 @@ src-tauri/src/
   lib.rs                   Wiring del builder de Tauri (plugins, bandeja, menú, arranque)
 ```
 
-**Comandos** (`invoke`): `load_config`, `save_config`, `test_connection`, `cancel_test`, `trust_host_key`, `list_remote_dir`, `delete_remote`, `rename_remote`, `upload_files`, `sync_now`, `cancel_sync`, `start_watch`, `stop_watch`, `list_watching`, `load_settings`, `save_settings`, `export_config`, `import_config`.
+**Comandos** (`invoke`): `load_config`, `save_config`, `test_connection`, `cancel_test`, `trust_host_key`, `list_remote_dir`, `delete_remote`, `rename_remote`, `upload_files`, `sync_now`, `cancel_sync`, `start_watch`, `stop_watch`, `list_watching`, `ssh_open`, `ssh_input`, `ssh_resize`, `ssh_close`, `ssh_open_external`, `load_settings`, `save_settings`, `export_config`, `import_config`.
 
 **Eventos** (`listen`): `sftp-log` (líneas de actividad por perfil) · `sftp-watch-state` (estado del watcher).
 

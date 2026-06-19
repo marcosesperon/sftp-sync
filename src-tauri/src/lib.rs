@@ -5,7 +5,9 @@ mod ignore;
 mod notifications;
 mod settings;
 mod sftp;
+mod ssh_shell;
 mod sync;
+mod system_terminal;
 mod watcher;
 
 use commands::AppState;
@@ -176,6 +178,11 @@ pub fn run() {
             commands::start_watch,
             commands::stop_watch,
             commands::list_watching,
+            commands::ssh_open,
+            commands::ssh_input,
+            commands::ssh_resize,
+            commands::ssh_close,
+            commands::ssh_open_external,
             commands::load_settings,
             commands::save_settings,
             commands::export_config,

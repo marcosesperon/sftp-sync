@@ -23,6 +23,11 @@ pub struct Settings {
     pub verify_host_key: bool,
     /// Buscar versiones nuevas en GitHub al iniciar.
     pub check_updates: bool,
+    /// Modo de conexión SSH: `"integrated"` (terminal en la app),
+    /// `"system"` (terminal del sistema) o `"putty"` (solo Windows).
+    pub ssh_mode: String,
+    /// Ruta a `putty.exe`. `None` = autodetectar.
+    pub putty_path: Option<String>,
 }
 
 impl Default for Settings {
@@ -36,6 +41,8 @@ impl Default for Settings {
             launch_at_login: false,
             verify_host_key: true,
             check_updates: true,
+            ssh_mode: "integrated".to_string(),
+            putty_path: None,
         }
     }
 }

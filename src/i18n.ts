@@ -34,6 +34,7 @@ const es: Dict = {
   "field.keyPath": "Ruta de la clave privada",
   "btn.browse": "Examinar…",
   "field.passphrase": "Passphrase (opcional)",
+  "field.puttyPpk": "Clave .ppk (PuTTY)",
   "field.password": "Contraseña",
   "field.localRoot": "Raíz local",
   "field.remotePath": "Ruta remota",
@@ -57,7 +58,20 @@ const es: Dict = {
   "action.save": "Guardar",
   "action.test": "Probar conexión",
   "action.syncNow": "Sincronizar ahora",
+  "action.ssh": "Conectar por SSH",
   "action.delete": "Eliminar",
+  // Terminal SSH
+  "ssh.tab": "SSH",
+  "ssh.closeSession": "Cerrar sesión SSH",
+  "ssh.modeIntegrated": "Terminal integrada (en la app)",
+  "ssh.modeSystem": "Terminal del sistema",
+  "ssh.modePutty": "PuTTY",
+  "ssh.note.integrated":
+    "La conexión SSH se abre en una pestaña dentro de la app, reutilizando las credenciales del perfil.",
+  "ssh.note.system":
+    "Se abre la terminal del sistema con ssh. Con autenticación por contraseña, la pedirá la propia terminal; usa el known_hosts del sistema.",
+  "ssh.note.putty":
+    "Se abre PuTTY. Con contraseña se inyecta automáticamente; con clave, indica una clave .ppk en cada perfil. Solo disponible en Windows.",
   // Panel de log
   "log.activity": "Actividad",
   "log.commands": "Comandos",
@@ -86,8 +100,11 @@ const es: Dict = {
   // Diálogos
   "dialog.pickKey": "Selecciona la clave privada",
   "dialog.pickLocal": "Selecciona la raíz local",
+  "dialog.pickPpk": "Selecciona la clave .ppk",
+  "dialog.pickPutty": "Selecciona putty.exe",
   // Estado
   "status.loadError": "Error al cargar configuración: {e}",
+  "status.sshLaunched": "Conexión SSH abierta en la herramienta externa.",
   "status.saveError": "Error al guardar: {e}",
   "status.saved": "Configuración guardada.",
   "status.synced":
@@ -122,6 +139,10 @@ const es: Dict = {
   "settings.security": "Seguridad",
   "settings.verifyHostKey": "Verificar la clave del servidor (known_hosts)",
   "settings.checkUpdates": "Buscar actualizaciones al iniciar",
+  "settings.ssh": "SSH",
+  "settings.sshMode": "Modo de conexión",
+  "settings.puttyPath": "Ruta a PuTTY",
+  "settings.puttyPathPlaceholder": "Autodetectar (dejar vacío)",
   "update.available": "Nueva versión {v} disponible",
   "update.download": "Descargar",
   "update.skip": "Omitir",
@@ -164,6 +185,7 @@ const en: Dict = {
   "field.keyPath": "Private key path",
   "btn.browse": "Browse…",
   "field.passphrase": "Passphrase (optional)",
+  "field.puttyPpk": ".ppk key (PuTTY)",
   "field.password": "Password",
   "field.localRoot": "Local root",
   "field.remotePath": "Remote path",
@@ -186,7 +208,19 @@ const en: Dict = {
   "action.save": "Save",
   "action.test": "Test connection",
   "action.syncNow": "Sync now",
+  "action.ssh": "Connect via SSH",
   "action.delete": "Delete",
+  "ssh.tab": "SSH",
+  "ssh.closeSession": "Close SSH session",
+  "ssh.modeIntegrated": "Integrated terminal (in-app)",
+  "ssh.modeSystem": "System terminal",
+  "ssh.modePutty": "PuTTY",
+  "ssh.note.integrated":
+    "The SSH connection opens in a tab inside the app, reusing the profile credentials.",
+  "ssh.note.system":
+    "Opens the system terminal with ssh. With password auth, the terminal itself will prompt for it; uses the system known_hosts.",
+  "ssh.note.putty":
+    "Opens PuTTY. With a password it is injected automatically; with a key, set a .ppk key per profile. Windows only.",
   "log.activity": "Activity",
   "log.commands": "Commands",
   "log.explorer": "Explorer",
@@ -213,7 +247,10 @@ const en: Dict = {
   "resize.hint": "Drag to resize",
   "dialog.pickKey": "Select the private key",
   "dialog.pickLocal": "Select the local root",
+  "dialog.pickPpk": "Select the .ppk key",
+  "dialog.pickPutty": "Select putty.exe",
   "status.loadError": "Error loading configuration: {e}",
+  "status.sshLaunched": "SSH connection opened in the external tool.",
   "status.saveError": "Error saving: {e}",
   "status.saved": "Configuration saved.",
   "status.synced":
@@ -246,6 +283,10 @@ const en: Dict = {
   "settings.security": "Security",
   "settings.verifyHostKey": "Verify server host key (known_hosts)",
   "settings.checkUpdates": "Check for updates on launch",
+  "settings.ssh": "SSH",
+  "settings.sshMode": "Connection mode",
+  "settings.puttyPath": "PuTTY path",
+  "settings.puttyPathPlaceholder": "Auto-detect (leave empty)",
   "update.available": "Version {v} available",
   "update.download": "Download",
   "update.skip": "Skip",
@@ -269,6 +310,9 @@ export function detectLang(): Lang {
 }
 
 /// Crea una función de traducción `t(key, vars?)` para el idioma dado.
+/// Tipo de la función de traducción devuelta por `makeT`.
+export type T = ReturnType<typeof makeT>;
+
 export function makeT(lang: Lang) {
   const d = dicts[lang] || es;
   return (key: string, vars?: Record<string, string | number>): string => {

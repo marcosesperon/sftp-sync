@@ -4,6 +4,15 @@ Todas las novedades notables de este proyecto se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.5.0] - 2026-06-19
+
+### Añadido
+- **Conexión SSH** desde el perfil (botón *Conectar por SSH*), con tres modos configurables en *Ajustes → SSH*:
+  - **Terminal integrada**: abre una sesión SSH interactiva en una pestaña dentro de la app (reutiliza las credenciales y la verificación de host key del perfil). Admite **varias sesiones a la vez** (contador en la pestaña y menú para alternar entre ellas), incluso del mismo perfil; la sesión sigue viva al cambiar de pestaña o activar el watcher.
+  - **Terminal del sistema**: lanza el `ssh` del sistema en la terminal nativa (iTerm2 o Terminal.app en macOS, Windows Terminal/`cmd` en Windows, emuladores comunes en Linux). Con contraseña, la pide la propia terminal.
+  - **PuTTY** (solo Windows): abre PuTTY con autodetección del ejecutable (ruta configurable). Con contraseña se inyecta automáticamente; con clave se usa una `.ppk` indicada en el perfil.
+- Opción por perfil para **reproducir el sonido de error del sistema** cuando falla una subida con el watcher iniciado.
+
 ## [0.4.1] - 2026-06-07
 
 ### Mejorado

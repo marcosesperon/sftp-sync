@@ -27,6 +27,7 @@ import {
   newProfile,
 } from "./types";
 import { detectLang, Lang, makeT } from "./i18n";
+import { useSshSession } from "./useSshSession";
 import "./App.css";
 
 // Resumen legible de los argumentos de un comando, ocultando secretos.
@@ -93,7 +94,12 @@ const DEFAULT_SETTINGS: Settings = {
   launchAtLogin: false,
   verifyHostKey: true,
   checkUpdates: true,
+  sshMode: "integrated",
+  puttyPath: null,
 };
+
+// La opción PuTTY solo tiene sentido en Windows.
+const IS_WINDOWS = navigator.userAgent.includes("Windows");
 
 const REPO = "marcosesperon/sftp-sync";
 
@@ -136,9 +142,9 @@ function App() {
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [cmdLogs, setCmdLogs] = useState<CmdLog[]>([]);
-  const [logTab, setLogTab] = useState<"activity" | "commands" | "explorer">(
-    "activity"
-  );
+  const [logTab, setLogTab] = useState<
+    "activity" | "commands" | "explorer" | "ssh"
+  >("activity");
   const [editTab, setEditTab] = useState<
     "connection" | "sync" | "notifications"
   >("connection");
@@ -153,6 +159,10 @@ function App() {
     url: string;
   } | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  // Sesiones SSH integradas (viven aunque se cambie de pestaña o se active el watcher).
+  const v_ssh = useSshSession(settings.theme);
+  // Menú desplegable para elegir entre varias sesiones SSH.
+  const [sshMenu, setSshMenu] = useState(false);
   const [explorerPath, setExplorerPath] = useState<string>("");
   const [explorerEntries, setExplorerEntries] = useState<RemoteEntry[]>([]);
   const [explorerLoading, setExplorerLoading] = useState(false);
@@ -353,6 +363,25 @@ function App() {
     localStorage.setItem("logHeight", String(logHeight));
   }, [logHeight]);
 
+  // Reajusta la terminal activa al mostrar la pestaña, cambiar de sesión o
+  // redimensionar el panel (estaba oculta y necesita recalcular su tamaño).
+  useEffect(() => {
+    if (logTab === "ssh") v_ssh.fit();
+  }, [logTab, v_ssh.activeId, logHeight, v_ssh.fit]);
+
+  // Si se cierran todas las sesiones, abandona la pestaña SSH.
+  useEffect(() => {
+    if (logTab === "ssh" && v_ssh.sessions.length === 0) setLogTab("activity");
+  }, [logTab, v_ssh.sessions.length]);
+
+  // Cierra el menú de sesiones SSH al hacer clic fuera.
+  useEffect(() => {
+    if (!sshMenu) return;
+    const v_close = () => setSshMenu(false);
+    window.addEventListener("click", v_close);
+    return () => window.removeEventListener("click", v_close);
+  }, [sshMenu]);
+
   // Drag & drop de ficheros locales sobre el explorador → subir.
   useEffect(() => {
     const un = getCurrentWindow().onDragDropEvent((ev) => {
@@ -416,6 +445,24 @@ function App() {
       title: t("dialog.pickLocal"),
     });
     if (typeof sel === "string") update({ localRoot: sel });
+  }
+
+  async function pickPpkFile() {
+    const sel = await open({
+      multiple: false,
+      directory: false,
+      title: t("dialog.pickPpk"),
+    });
+    if (typeof sel === "string") update({ puttyPpkPath: sel });
+  }
+
+  async function pickPuttyPath() {
+    const sel = await open({
+      multiple: false,
+      directory: false,
+      title: t("dialog.pickPutty"),
+    });
+    if (typeof sel === "string") saveSettings({ puttyPath: sel });
   }
 
   async function persist(next: Profile[]) {
@@ -662,6 +709,24 @@ function App() {
   }
   uploadDroppedRef.current = doUpload;
 
+  // Conecta por SSH según el modo configurado: terminal integrada en la app,
+  // terminal del sistema o PuTTY (estos dos últimos vía herramienta externa).
+  async function connectSsh() {
+    if (!selected) return;
+    if (settings.sshMode === "integrated") {
+      v_ssh.open(selected);
+      setLogTab("ssh");
+      return;
+    }
+    await persist(profiles);
+    try {
+      await call("ssh_open_external", { profile: selected });
+      setStatus(t("status.sshLaunched"));
+    } catch {
+      // El error ya queda registrado en el panel de comandos por call().
+    }
+  }
+
   async function toggleWatch() {
     if (!selected) return;
     const id = selected.id;
@@ -783,7 +848,64 @@ function App() {
         >
           {t("log.explorer")}
         </button>
-        {logTab === "explorer" ? (
+        {v_ssh.sessions.length > 0 && (
+          <div className="tab-ssh">
+            <button
+              className={`tab ${logTab === "ssh" ? "on" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setLogTab("ssh");
+                // Con varias sesiones, despliega el selector; con una, va directo.
+                setSshMenu(v_ssh.sessions.length > 1 ? !sshMenu : false);
+              }}
+            >
+              {t("ssh.tab")} ({v_ssh.sessions.length})
+            </button>
+            {sshMenu && (
+              <div className="ssh-menu" onClick={(e) => e.stopPropagation()}>
+                {v_ssh.sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`ssh-menu-item ${
+                      s.id === v_ssh.activeId ? "on" : ""
+                    }`}
+                    onClick={() => {
+                      v_ssh.setActive(s.id);
+                      setLogTab("ssh");
+                      setSshMenu(false);
+                    }}
+                  >
+                    <span className="ssh-menu-text">
+                      <span className="ssh-menu-name">{s.profile.name}</span>
+                      <span className="ssh-menu-sub">
+                        {s.profile.username}@{s.profile.host}
+                      </span>
+                    </span>
+                    <button
+                      className="ssh-menu-close"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        v_ssh.close(s.id);
+                      }}
+                      title={t("ssh.closeSession")}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {logTab === "ssh" ? (
+          <button
+            className="tab clear"
+            onClick={() => v_ssh.activeId && v_ssh.close(v_ssh.activeId)}
+            title={t("ssh.closeSession")}
+          >
+            ✕
+          </button>
+        ) : logTab === "explorer" ? (
           <button
             className="tab clear"
             onClick={() => explorerPath && loadExplorer(explorerPath)}
@@ -830,7 +952,7 @@ function App() {
           ))}
           <div ref={cmdEndRef} />
         </div>
-      ) : (
+      ) : logTab === "explorer" ? (
         <div className={`log-body explorer ${dragOver ? "dragover" : ""}`}>
           {dragOver && (
             <div className="drop-overlay">{t("explorer.dropHint")}</div>
@@ -883,6 +1005,28 @@ function App() {
               ))}
             </>
           )}
+        </div>
+      ) : null}
+      {v_ssh.sessions.length > 0 && (
+        <div
+          className="log-body ssh-layer"
+          style={{ display: logTab === "ssh" ? "flex" : "none" }}
+        >
+          {v_ssh.sessions.map((s) => (
+            <div
+              key={s.id}
+              className="ssh-pane"
+              style={{ display: s.id === v_ssh.activeId ? "flex" : "none" }}
+            >
+              {s.error && <div className="ssh-error">{s.error}</div>}
+              <div
+                className="ssh-term-host"
+                ref={(el) => {
+                  if (el) v_ssh.attach(s.id, el);
+                }}
+              />
+            </div>
+          ))}
         </div>
       )}
     </>
@@ -1133,6 +1277,23 @@ function App() {
                               }
                             />
                           </div>
+                          {settings.sshMode === "putty" && IS_WINDOWS && (
+                            <div className="form-row">
+                              <label>{t("field.puttyPpk")}</label>
+                              <div className="input-with-btn">
+                                <input
+                                  value={selected.puttyPpkPath ?? ""}
+                                  placeholder="C:\\ruta\\clave.ppk"
+                                  onChange={(e) =>
+                                    update({ puttyPpkPath: e.target.value })
+                                  }
+                                />
+                                <button className="browse" onClick={pickPpkFile}>
+                                  {t("btn.browse")}
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </>
                       ) : (
                         <div className="form-row">
@@ -1344,6 +1505,9 @@ function App() {
                           t("watch.start")
                         )}
                       </button>
+                      <button onClick={connectSsh} disabled={!canConnect}>
+                        {t("action.ssh")}
+                      </button>
                       <button
                         className="ghost"
                         onClick={() => deleteProfile(selected.id)}
@@ -1376,7 +1540,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="about-title">SFTP Sync</h2>
-            <p className="about-version">v0.4.1</p>
+            <p className="about-version">v0.5.0</p>
             <div className="about-author">
               <div className="about-name">Marcos Esperón</div>
               <button
@@ -1504,6 +1668,43 @@ function App() {
                 />
                 {t("settings.verifyHostKey")}
               </label>
+            </div>
+
+            <div className="settings-section">
+              <h3 className="settings-h">{t("settings.ssh")}</h3>
+              <div className="settings-row">
+                <label>{t("settings.sshMode")}</label>
+                <select
+                  value={settings.sshMode}
+                  onChange={(e) =>
+                    saveSettings({ sshMode: e.target.value as Settings["sshMode"] })
+                  }
+                >
+                  <option value="integrated">{t("ssh.modeIntegrated")}</option>
+                  <option value="system">{t("ssh.modeSystem")}</option>
+                  {IS_WINDOWS && (
+                    <option value="putty">{t("ssh.modePutty")}</option>
+                  )}
+                </select>
+              </div>
+              {settings.sshMode === "putty" && IS_WINDOWS && (
+                <div className="settings-row">
+                  <label>{t("settings.puttyPath")}</label>
+                  <div className="input-with-btn">
+                    <input
+                      value={settings.puttyPath ?? ""}
+                      placeholder={t("settings.puttyPathPlaceholder")}
+                      onChange={(e) =>
+                        saveSettings({ puttyPath: e.target.value || null })
+                      }
+                    />
+                    <button className="browse" onClick={pickPuttyPath}>
+                      {t("btn.browse")}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="settings-note">{t(`ssh.note.${settings.sshMode}`)}</p>
             </div>
 
             <div className="settings-section">

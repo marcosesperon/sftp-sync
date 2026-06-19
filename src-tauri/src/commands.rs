@@ -22,6 +22,8 @@ pub struct AppState {
     pub test_cancels: Mutex<HashMap<String, tokio::sync::oneshot::Sender<()>>>,
     /// Señales de cancelación de sincronizaciones en curso, por id de perfil.
     pub sync_cancels: Mutex<HashMap<String, tokio::sync::oneshot::Sender<()>>>,
+    /// Sesiones SSH (shell) abiertas, por id de perfil.
+    pub ssh_sessions: Mutex<HashMap<String, crate::ssh_shell::SshSession>>,
 }
 
 /// Ruta del fichero de configuración (`app_config_dir/profiles.json`).
@@ -413,6 +415,105 @@ pub(crate) fn update_tray(app: &AppHandle, count: usize) {
 pub fn list_watching(state: State<AppState>) -> Result<Vec<String>, String> {
     let watchers = state.watchers.lock().map_err(|e| e.to_string())?;
     Ok(watchers.keys().cloned().collect())
+}
+
+// ---------------------------------------------------------------------------
+// Terminal SSH integrada
+// ---------------------------------------------------------------------------
+
+/// Abre una shell SSH interactiva para el perfil indicado. La salida del
+/// servidor se transmite en crudo por el canal `on_data`.
+#[tauri::command]
+pub async fn ssh_open(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    profile: Profile,
+    session_id: String,
+    cols: u16,
+    rows: u16,
+    on_data: tauri::ipc::Channel<Vec<u8>>,
+) -> Result<(), String> {
+    // Si ya había una shell con este id, ciérrala antes de abrir la nueva.
+    let previous = {
+        let mut sessions = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
+        sessions.remove(&session_id)
+    };
+    if let Some(old) = previous {
+        let _ = old.tx.send(crate::ssh_shell::ShellCmd::Close).await;
+        old.reader.abort();
+    }
+
+    let mode = host_key_mode(&app);
+    let session = crate::ssh_shell::open(&profile, mode, cols, rows, on_data).await?;
+    state
+        .ssh_sessions
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(session_id, session);
+    Ok(())
+}
+
+/// Envía datos tecleados por el usuario a la shell.
+#[tauri::command]
+pub async fn ssh_input(
+    state: State<'_, AppState>,
+    session_id: String,
+    data: Vec<u8>,
+) -> Result<(), String> {
+    // Clonamos el `tx` y soltamos el lock antes del `.await` (no sostener el Mutex).
+    let tx = {
+        let sessions = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
+        sessions.get(&session_id).map(|s| s.tx.clone())
+    };
+    if let Some(tx) = tx {
+        let _ = tx.send(crate::ssh_shell::ShellCmd::Input(data)).await;
+    }
+    Ok(())
+}
+
+/// Notifica un redimensionado del terminal al servidor.
+#[tauri::command]
+pub async fn ssh_resize(
+    state: State<'_, AppState>,
+    session_id: String,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
+    let tx = {
+        let sessions = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
+        sessions.get(&session_id).map(|s| s.tx.clone())
+    };
+    if let Some(tx) = tx {
+        let _ = tx.send(crate::ssh_shell::ShellCmd::Resize(cols, rows)).await;
+    }
+    Ok(())
+}
+
+/// Cierra la shell SSH y libera la sesión.
+#[tauri::command]
+pub async fn ssh_close(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
+    let session = {
+        let mut sessions = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
+        sessions.remove(&session_id)
+    };
+    if let Some(session) = session {
+        let _ = session.tx.send(crate::ssh_shell::ShellCmd::Close).await;
+        session.reader.abort();
+    }
+    Ok(())
+}
+
+/// Abre la conexión SSH en una herramienta externa (terminal del sistema o
+/// PuTTY) según el modo configurado en los ajustes.
+#[tauri::command]
+pub fn ssh_open_external(app: AppHandle, profile: Profile) -> Result<(), String> {
+    let settings = Settings::load(&settings_path(&app)?).map_err(|e| e.to_string())?;
+    match settings.ssh_mode.as_str() {
+        "putty" => {
+            crate::system_terminal::open_putty(&profile, settings.putty_path.as_deref())
+        }
+        _ => crate::system_terminal::open_system_terminal(&profile),
+    }
 }
 
 // ---------------------------------------------------------------------------

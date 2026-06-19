@@ -6,6 +6,8 @@ export type Auth =
 
 export type NotifyMode = "off" | "errors" | "summary" | "all";
 
+export type SshMode = "integrated" | "system" | "putty";
+
 export interface Profile {
   id: string;
   name: string;
@@ -23,6 +25,8 @@ export interface Profile {
   mirrorDelete: boolean;
   notify: NotifyMode;
   errorSound: boolean;
+  /** Ruta a la clave .ppk para conectar con PuTTY (opcional). */
+  puttyPpkPath?: string;
 }
 
 export interface Config {
@@ -38,6 +42,8 @@ export interface Settings {
   launchAtLogin: boolean;
   verifyHostKey: boolean;
   checkUpdates: boolean;
+  sshMode: SshMode;
+  puttyPath: string | null;
 }
 
 export interface SyncStats {

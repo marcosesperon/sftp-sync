@@ -40,7 +40,7 @@ fn is_key_changed(e: &russh::keys::Error) -> bool {
 }
 
 /// Handler de cliente SSH que verifica la clave del servidor según el modo.
-struct ClientHandler {
+pub(crate) struct ClientHandler {
     mode: HostKeyMode,
     host: String,
     port: u16,
@@ -81,6 +81,98 @@ impl client::Handler for ClientHandler {
     }
 }
 
+/// Handshake SSH + autenticación. Devuelve el `Handle` de sesión ya autenticado,
+/// reutilizable para abrir SFTP o una shell interactiva (verifica el host key según `mode`).
+pub(crate) async fn connect_authenticated(
+    profile: &Profile,
+    mode: HostKeyMode,
+) -> std::result::Result<Handle<ClientHandler>, ConnectError> {
+    let verdict: Arc<Mutex<Option<ConnectError>>> = Arc::new(Mutex::new(None));
+    let config = Arc::new(client::Config::default());
+    let handler = ClientHandler {
+        mode,
+        host: profile.host.clone(),
+        port: profile.port,
+        verdict: verdict.clone(),
+    };
+
+    let session =
+        match client::connect(config, (profile.host.as_str(), profile.port), handler).await {
+            Ok(s) => s,
+            Err(e) => {
+                // Si el fallo fue por la verificación del host key, devolvemos
+                // el veredicto tipado para que la UI pueda ofrecer confiar.
+                if let Some(v) = verdict.lock().ok().and_then(|mut g| g.take()) {
+                    return Err(v);
+                }
+                return Err(ConnectError::Other(format!(
+                    "no se pudo conectar a {}:{}: {e}",
+                    profile.host, profile.port
+                )));
+            }
+        };
+
+    // Autenticación (usa anyhow internamente y se mapea a Other).
+    let authed: Result<Handle<ClientHandler>> = async {
+        let mut session = session;
+        let auth: AuthResult = match &profile.auth {
+            Auth::Key {
+                private_key_path,
+                passphrase,
+            } => {
+                let key = load_secret_key(private_key_path, passphrase.as_deref())
+                    .with_context(|| format!("no se pudo cargar la clave {private_key_path}"))?;
+                let key = Arc::new(key);
+                // RSA: servidores OpenSSH modernos rechazan ssh-rsa (SHA-1);
+                // probamos rsa-sha2-512/256 antes de caer a SHA-1.
+                let is_rsa = key.algorithm().as_str().starts_with("ssh-rsa");
+                let hash_algs: Vec<Option<HashAlg>> = if is_rsa {
+                    vec![Some(HashAlg::Sha512), Some(HashAlg::Sha256), None]
+                } else {
+                    vec![None]
+                };
+                let mut last = None;
+                for alg in hash_algs {
+                    let r = session
+                        .authenticate_publickey(
+                            &profile.username,
+                            PrivateKeyWithHashAlg::new(key.clone(), alg),
+                        )
+                        .await?;
+                    let ok = matches!(r, AuthResult::Success);
+                    last = Some(r);
+                    if ok {
+                        break;
+                    }
+                }
+                last.expect("al menos un intento de autenticación")
+            }
+            Auth::Password { password } => {
+                session
+                    .authenticate_password(&profile.username, password)
+                    .await?
+            }
+        };
+
+        match auth {
+            AuthResult::Success => {}
+            AuthResult::Failure {
+                remaining_methods, ..
+            } => {
+                return Err(anyhow!(
+                    "autenticación rechazada para '{}'. Métodos que acepta el servidor: {:?}",
+                    profile.username,
+                    remaining_methods
+                ));
+            }
+        }
+        Ok(session)
+    }
+    .await;
+
+    authed.map_err(|e| ConnectError::Other(e.to_string()))
+}
+
 pub struct SftpConnection {
     /// Se conserva para mantener viva la sesión SSH mientras exista el SFTP.
     _session: Handle<ClientHandler>,
@@ -94,86 +186,8 @@ impl SftpConnection {
         profile: &Profile,
         mode: HostKeyMode,
     ) -> std::result::Result<Self, ConnectError> {
-        let verdict: Arc<Mutex<Option<ConnectError>>> = Arc::new(Mutex::new(None));
-        let config = Arc::new(client::Config::default());
-        let handler = ClientHandler {
-            mode,
-            host: profile.host.clone(),
-            port: profile.port,
-            verdict: verdict.clone(),
-        };
-
-        let session =
-            match client::connect(config, (profile.host.as_str(), profile.port), handler).await {
-                Ok(s) => s,
-                Err(e) => {
-                    // Si el fallo fue por la verificación del host key, devolvemos
-                    // el veredicto tipado para que la UI pueda ofrecer confiar.
-                    if let Some(v) = verdict.lock().ok().and_then(|mut g| g.take()) {
-                        return Err(v);
-                    }
-                    return Err(ConnectError::Other(format!(
-                        "no se pudo conectar a {}:{}: {e}",
-                        profile.host, profile.port
-                    )));
-                }
-            };
-
-        // El resto (auth + subsistema SFTP) usa anyhow y se mapea a Other.
+        let session = connect_authenticated(profile, mode).await?;
         let built: Result<SftpConnection> = async {
-            let mut session = session;
-            let auth: AuthResult = match &profile.auth {
-                Auth::Key {
-                    private_key_path,
-                    passphrase,
-                } => {
-                    let key = load_secret_key(private_key_path, passphrase.as_deref())
-                        .with_context(|| format!("no se pudo cargar la clave {private_key_path}"))?;
-                    let key = Arc::new(key);
-                    // RSA: servidores OpenSSH modernos rechazan ssh-rsa (SHA-1);
-                    // probamos rsa-sha2-512/256 antes de caer a SHA-1.
-                    let is_rsa = key.algorithm().as_str().starts_with("ssh-rsa");
-                    let hash_algs: Vec<Option<HashAlg>> = if is_rsa {
-                        vec![Some(HashAlg::Sha512), Some(HashAlg::Sha256), None]
-                    } else {
-                        vec![None]
-                    };
-                    let mut last = None;
-                    for alg in hash_algs {
-                        let r = session
-                            .authenticate_publickey(
-                                &profile.username,
-                                PrivateKeyWithHashAlg::new(key.clone(), alg),
-                            )
-                            .await?;
-                        let ok = matches!(r, AuthResult::Success);
-                        last = Some(r);
-                        if ok {
-                            break;
-                        }
-                    }
-                    last.expect("al menos un intento de autenticación")
-                }
-                Auth::Password { password } => {
-                    session
-                        .authenticate_password(&profile.username, password)
-                        .await?
-                }
-            };
-
-            match auth {
-                AuthResult::Success => {}
-                AuthResult::Failure {
-                    remaining_methods, ..
-                } => {
-                    return Err(anyhow!(
-                        "autenticación rechazada para '{}'. Métodos que acepta el servidor: {:?}",
-                        profile.username,
-                        remaining_methods
-                    ));
-                }
-            }
-
             let channel = session.channel_open_session().await?;
             channel.request_subsystem(true, "sftp").await?;
             let sftp = SftpSession::new(channel.into_stream()).await?;
@@ -183,7 +197,6 @@ impl SftpConnection {
             })
         }
         .await;
-
         built.map_err(|e| ConnectError::Other(e.to_string()))
     }
 

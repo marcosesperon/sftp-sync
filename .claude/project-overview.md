@@ -4,8 +4,13 @@ App de escritorio multiplataforma (macOS/Windows/Linux) para **sincronización S
 alternativa nativa e independiente del editor. **Tauri 2 + React (TS)** en el frontend
 y un **núcleo en Rust puro** (sin dependencias nativas en C).
 
-- **Versión publicada:** 0.4.1. Repo: github.com/marcosesperon/sftp-sync. Licencia: **MIT**.
+- **Versión:** 0.5.0 (preparada, pendiente de tag). Repo: github.com/marcosesperon/sftp-sync. Licencia: **MIT**.
 - **Web (GitHub Pages):** https://marcosesperon.github.io/sftp-sync/ (servida desde `/docs`, ES + `/en/`).
+- **v0.5.0:** **conexión SSH** desde el perfil (botón *Conectar por SSH*) en 3 modos (Ajustes → SSH):
+  terminal **integrada** (xterm.js + shell `russh` con PTY, **multisesión** con contador/menú y persistente
+  al cambiar de pestaña), **terminal del sistema** (iTerm2/Terminal.app, Windows Terminal/cmd, emuladores
+  Linux; la contraseña la pide la terminal), y **PuTTY** (solo Windows; `-pwfile` para contraseña, `.ppk`
+  por perfil para clave). Además, sonido de error del sistema por perfil al fallar una subida del watcher.
 - **v0.4.1:** dedup por hash en el watcher, indicador "Iniciando…" del botón de watcher, y panel de
   Actividad con tamaño alineado a la derecha (sin paréntesis) y ruta truncada con `…`.
 
@@ -14,6 +19,7 @@ y un **núcleo en Rust puro** (sin dependencias nativas en C).
 - **Shell:** Tauri 2 (features `tray-icon`, `image-png`).
 - **Frontend:** React 19 + TypeScript + Vite. Gestor: **pnpm**.
 - **SSH/SFTP:** `russh` 0.54 + `russh-sftp` 2 (puro Rust; sin libssh2).
+- **Terminal integrada:** `@xterm/xterm` + `@xterm/addon-fit` sobre shell `russh` con PTY.
 - **Watcher:** `notify` 8 + `notify-debouncer-full`.
 - **Globs:** `globset` (ignore + include).
 - **Plugins Tauri:** dialog, notification, opener, autostart, single-instance.
@@ -28,18 +34,21 @@ src/                       Frontend React
   types.ts                 Tipos espejo del modelo Rust (Profile, Settings, RemoteEntry, …)
   i18n.ts                  Diccionarios es/en + makeT(lang) + detectLang()
   App.tsx                  UI completa (perfiles con pestañas, monitorización, panel
-                           Actividad/Comandos/Explorador redimensionable, modales Acerca de,
+                           Actividad/Comandos/Explorador/SSH redimensionable, modales Acerca de,
                            Ajustes, host key, renombrar, confirmar borrado; banner de update).
+  useSshSession.ts         Hook de terminales SSH integradas (xterm.js): multisesión, attach/fit,
+                           hosts siempre montados (visibilidad por CSS) para no perder la sesión
   App.css                  Estilos + temas (claro/oscuro por SO y forzado vía data-theme)
   main.tsx                 Entry point (desactiva el menú contextual del webview)
 src-tauri/src/
-  config.rs                Profile + Config + persistencia (profiles.json). NotifyMode.
+  config.rs                Profile + Config + persistencia (profiles.json). NotifyMode, putty_ppk_path.
   settings.rs              Settings global (theme, language, dock/tray, autostart watchers,
-                           launch_at_login, verify_host_key, check_updates) → settings.json
+                           launch_at_login, verify_host_key, check_updates, ssh_mode, putty_path)
   ignore.rs                Compila patrones ignore (gitignore) e include a GlobSet
-  sftp.rs                  Conexión russh + verificación de host key (HostKeyMode/ConnectError),
-                           ops SFTP (upload, remove_any, rename, mkdir_p, remove_dir_all,
-                           list_dir_entries con perms/mtime), learn_host_key, human_size
+  sftp.rs                  connect_authenticated (handshake+auth compartido) + verificación de host
+                           key (HostKeyMode/ConnectError) + ops SFTP, learn_host_key, human_size
+  ssh_shell.rs             Shell SSH interactiva con PTY (tarea propietaria + lectora, Channel<Vec<u8>>)
+  system_terminal.rs       Abre SSH en terminal del sistema (macOS/Win/Linux) o PuTTY (Windows)
   sync.rs                  Mapeo local→remoto, sync_all (include/ignore, carpetas vacías, espejo)
   watcher.rs               Watcher notify con debounce, include/ignore, batch de notificaciones,
                            DEDUP POR HASH de contenido (HashMap por sesión; omite idénticos)
@@ -57,8 +66,8 @@ scripts/changelog.mjs      Extrae notas del CHANGELOG.md para el release
 ### Comandos (invoke) y eventos (listen)
 - Comandos: `load_config`, `save_config`, `test_connection`, `cancel_test`, `trust_host_key`,
   `list_remote_dir`, `delete_remote`, `rename_remote`, `upload_files`, `sync_now`, `cancel_sync`,
-  `start_watch`, `stop_watch`, `list_watching`, `load_settings`, `save_settings`,
-  `export_config`, `import_config`.
+  `start_watch`, `stop_watch`, `list_watching`, `ssh_open`, `ssh_input`, `ssh_resize`, `ssh_close`,
+  `ssh_open_external`, `load_settings`, `save_settings`, `export_config`, `import_config`.
 - Eventos: `sftp-log` (actividad por perfil; el frontend le añade hora al recibir),
   `sftp-watch-state` (watcher on/off).
 - El frontend envuelve `invoke` en `call()` para registrar cada comando en la pestaña Comandos

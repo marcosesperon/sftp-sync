@@ -80,6 +80,9 @@ pub struct Profile {
     /// Reproducir el sonido de error del sistema si falla una subida del watcher.
     #[serde(default)]
     pub error_sound: bool,
+    /// Ruta a la clave en formato `.ppk` para conectar con PuTTY (opcional).
+    #[serde(default)]
+    pub putty_ppk_path: Option<String>,
 }
 
 fn default_port() -> u16 {
