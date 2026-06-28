@@ -4,6 +4,14 @@ Todas las novedades notables de este proyecto se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.5.1] - 2026-06-28
+
+### Corregido
+- El watcher no detectaba los cambios cuando un fichero se editaba mediante **reemplazo atómico** (escritura a un temporal + renombrado sobre el original), como hacen algunas herramientas y editores; el sistema operativo (p. ej. FSEvents en macOS) no siempre notifica ese evento. Se añade un **watcher de respaldo por sondeo** que cubre cualquier patrón de escritura, sin provocar subidas masivas al arrancar.
+
+### Añadido
+- Opción por perfil **"Detección por sondeo (respaldo)"** con intervalo configurable (`0` = desactivado; 2 s por defecto) en la pestaña *Sincronización*.
+
 ## [0.5.0] - 2026-06-19
 
 ### Añadido

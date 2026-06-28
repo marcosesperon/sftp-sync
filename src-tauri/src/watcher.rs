@@ -3,8 +3,8 @@
 //! Usa `notify-debouncer-full` para agrupar la ráfaga de eventos que generan los
 //! editores al guardar (escribir temporal + renombrar) en una sola acción.
 
-use notify::RecursiveMode;
-use notify_debouncer_full::{new_debouncer, DebounceEventResult};
+use notify::{Config, PollWatcher, RecursiveMode};
+use notify_debouncer_full::{new_debouncer, new_debouncer_opt, DebounceEventResult, NoCache};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -52,6 +52,8 @@ pub async fn run(app: AppHandle, profile: Profile) {
     // Canal puente: el handler del debouncer corre en su propio hilo (sync) y
     // reenvía los eventos a este bucle async sin bloquear.
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<DebounceEventResult>();
+    // Clon para el watcher de respaldo (se debe clonar antes de mover `tx`).
+    let tx_poll = tx.clone();
     let mut debouncer = match new_debouncer(
         Duration::from_millis(DEBOUNCE_MS),
         None,
@@ -72,6 +74,37 @@ pub async fn run(app: AppHandle, profile: Profile) {
         events::watch_state(&app, &profile.id, false);
         return;
     }
+
+    // Watcher de respaldo por sondeo (red de seguridad para backends nativos que
+    // pierden el reemplazo atómico/rename, p.ej. FSEvents en macOS). Compara solo
+    // metadatos (mtime/tamaño): barato y suficiente para detectar el rename. Su
+    // escaneo inicial es silencioso, así que no provoca subidas masivas al arrancar.
+    // Se mantiene vivo hasta el fin de `run()` (su Drop lo detiene al abortar).
+    let _poll_debouncer = if profile.poll_interval_secs > 0 {
+        let cfg = Config::default()
+            .with_poll_interval(Duration::from_secs(profile.poll_interval_secs))
+            .with_compare_contents(false);
+        let mut poll = new_debouncer_opt::<_, PollWatcher, NoCache>(
+            Duration::from_millis(DEBOUNCE_MS),
+            None,
+            move |res: DebounceEventResult| {
+                let _ = tx_poll.send(res);
+            },
+            NoCache::new(),
+            cfg,
+        )
+        .ok();
+        if let Some(pd) = poll.as_mut() {
+            if let Err(e) = pd.watch(&local_root, RecursiveMode::Recursive) {
+                // No es fatal: seguimos solo con el watcher nativo.
+                events::log(&app, &profile.id, "info", format!("respaldo por sondeo no disponible: {e}"));
+                poll = None;
+            }
+        }
+        poll
+    } else {
+        None
+    };
 
     events::log(&app, &profile.id, "info", format!("Vigilando {}", profile.local_root));
     events::watch_state(&app, &profile.id, true);

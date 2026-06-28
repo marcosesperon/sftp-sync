@@ -1415,7 +1415,37 @@ function App() {
                           />
                           {t("check.mirror")}
                         </label>
+                        <label title={t("check.pollBackup.title")}>
+                          <input
+                            type="checkbox"
+                            checked={(selected.pollIntervalSecs ?? 0) > 0}
+                            onChange={(e) =>
+                              update({ pollIntervalSecs: e.target.checked ? 2 : 0 })
+                            }
+                          />
+                          {t("check.pollBackup")}
+                        </label>
                       </div>
+
+                      {(selected.pollIntervalSecs ?? 0) > 0 && (
+                        <div className="form-row poll-interval">
+                          <label>{t("field.pollInterval")}</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={selected.pollIntervalSecs}
+                            onChange={(e) =>
+                              update({
+                                pollIntervalSecs: Math.max(
+                                  1,
+                                  Number(e.target.value) || 1
+                                ),
+                              })
+                            }
+                          />
+                        </div>
+                      )}
+                      <p className="settings-note">{t("poll.note")}</p>
                     </section>
                     )}
 
@@ -1540,7 +1570,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="about-title">SFTP Sync</h2>
-            <p className="about-version">v0.5.0</p>
+            <p className="about-version">v0.5.1</p>
             <div className="about-author">
               <div className="about-name">Marcos Esperón</div>
               <button

@@ -45,6 +45,12 @@ const es: Dict = {
   "check.syncEmptyDirs": "Sincronizar carpetas vacías",
   "check.mirror": "Modo espejo (borrar huérfanos en remoto)",
   "check.mirror.title": "Al sincronizar, borra del remoto lo que ya no existe en local",
+  "check.pollBackup": "Detección por sondeo (respaldo)",
+  "check.pollBackup.title":
+    "Red de seguridad: detecta cambios revisando la carpeta cada X segundos",
+  "field.pollInterval": "Intervalo de sondeo (s)",
+  "poll.note":
+    "Respaldo para editores que reemplazan el fichero al guardar (rename), cuyos cambios el sistema a veces no notifica. En carpetas muy grandes, sube el intervalo o desactívalo.",
   "notify.off": "Ninguna",
   "notify.errors": "Solo errores",
   "notify.summary": "Resumen",
@@ -196,6 +202,12 @@ const en: Dict = {
   "check.syncEmptyDirs": "Sync empty folders",
   "check.mirror": "Mirror mode (delete orphans on remote)",
   "check.mirror.title": "On sync, deletes from remote what no longer exists locally",
+  "check.pollBackup": "Polling detection (fallback)",
+  "check.pollBackup.title":
+    "Safety net: detects changes by scanning the folder every X seconds",
+  "field.pollInterval": "Polling interval (s)",
+  "poll.note":
+    "Fallback for editors that replace the file on save (rename), whose changes the OS sometimes doesn't report. For very large folders, raise the interval or disable it.",
   "notify.off": "None",
   "notify.errors": "Errors only",
   "notify.summary": "Summary",

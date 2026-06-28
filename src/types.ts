@@ -27,6 +27,8 @@ export interface Profile {
   errorSound: boolean;
   /** Ruta a la clave .ppk para conectar con PuTTY (opcional). */
   puttyPpkPath?: string;
+  /** Intervalo (s) del watcher de respaldo por sondeo. 0 = desactivado. */
+  pollIntervalSecs: number;
 }
 
 export interface Config {
@@ -103,5 +105,6 @@ export function newProfile(): Profile {
     mirrorDelete: false,
     notify: "errors",
     errorSound: false,
+    pollIntervalSecs: 2,
   };
 }

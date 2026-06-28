@@ -83,10 +83,18 @@ pub struct Profile {
     /// Ruta a la clave en formato `.ppk` para conectar con PuTTY (opcional).
     #[serde(default)]
     pub putty_ppk_path: Option<String>,
+    /// Intervalo (segundos) del watcher de respaldo por sondeo, red de seguridad
+    /// ante editores que reemplazan el fichero (rename). `0` = desactivado.
+    #[serde(default = "default_poll_interval")]
+    pub poll_interval_secs: u64,
 }
 
 fn default_port() -> u16 {
     22
+}
+
+fn default_poll_interval() -> u64 {
+    2
 }
 
 /// Contenedor raíz de la configuración persistida.
