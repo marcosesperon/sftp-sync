@@ -51,6 +51,8 @@ const es: Dict = {
   "field.pollInterval": "Intervalo de sondeo (s)",
   "poll.note":
     "Respaldo para editores que reemplazan el fichero al guardar (rename), cuyos cambios el sistema a veces no notifica. En carpetas muy grandes, sube el intervalo o desactívalo.",
+  "patterns.hint":
+    "Un patrón casa a cualquier nivel (ej. logs). Con barra inicial se ancla al primer nivel: /logs ignora la carpeta de la raíz pero no src/logs.",
   "notify.off": "Ninguna",
   "notify.errors": "Solo errores",
   "notify.summary": "Resumen",
@@ -208,6 +210,8 @@ const en: Dict = {
   "field.pollInterval": "Polling interval (s)",
   "poll.note":
     "Fallback for editors that replace the file on save (rename), whose changes the OS sometimes doesn't report. For very large folders, raise the interval or disable it.",
+  "patterns.hint":
+    "A pattern matches at any level (e.g. logs). With a leading slash it anchors to the top level: /logs ignores the root folder but not src/logs.",
   "notify.off": "None",
   "notify.errors": "Errors only",
   "notify.summary": "Summary",

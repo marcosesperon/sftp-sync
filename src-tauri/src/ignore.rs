@@ -17,11 +17,14 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 pub fn build(patterns: &[String]) -> anyhow::Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
     for raw in patterns {
+        // Una barra inicial ancla el patrón a la raíz local (estilo gitignore):
+        // así casa solo en el primer nivel, no a cualquier profundidad.
+        let anchored = raw.trim().starts_with('/');
         let p = raw.trim().trim_matches('/');
         if p.is_empty() {
             continue;
         }
-        for variant in expand(p) {
+        for variant in expand(p, anchored) {
             // Patrones inválidos no deben tumbar la sincronización entera.
             if let Ok(glob) = Glob::new(&variant) {
                 builder.add(glob);
@@ -32,10 +35,22 @@ pub fn build(patterns: &[String]) -> anyhow::Result<GlobSet> {
 }
 
 /// Expande un patrón a las variantes necesarias para casar como gitignore.
-fn expand(p: &str) -> Vec<String> {
+///
+/// Si `anchored` es `true` (el patrón venía con barra inicial), solo casa en el
+/// primer nivel: no se añaden las variantes `**/...` que buscan en subniveles.
+fn expand(p: &str, anchored: bool) -> Vec<String> {
+    let has_glob = p.contains('*') || p.contains('?') || p.contains('[');
+    if anchored {
+        // Anclado a la raíz: sin búsqueda en subdirectorios.
+        if has_glob {
+            return vec![p.to_string()];
+        }
+        // Nombre simple anclado: la carpeta del primer nivel y su contenido.
+        return vec![p.to_string(), format!("{p}/**")];
+    }
     // Si ya contiene un glob explícito (`*`, `?`, `[`), respetamos al usuario
     // y solo añadimos la variante "en cualquier subdirectorio".
-    if p.contains('*') || p.contains('?') || p.contains('[') {
+    if has_glob {
         return vec![p.to_string(), format!("**/{p}")];
     }
     // Patrón simple (`.vscode`, `.git`, `.DS_Store`): casa el propio nombre en
@@ -71,11 +86,19 @@ pub fn build_include(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {
     }
 
     let mut builder = GlobSetBuilder::new();
-    for p in meaningful {
+    for raw in meaningful {
+        // Barra inicial = anclado a la raíz (igual que en los patrones ignore).
+        let anchored = raw.starts_with('/');
+        let p = raw.trim_matches('/');
+        if p.is_empty() {
+            continue;
+        }
         if let Ok(glob) = Glob::new(p) {
             builder.add(glob);
         }
-        if !p.contains('/') {
+        // Un patrón suelto (sin barra y sin anclar) también casa a cualquier
+        // profundidad: p. ej. `*.php` incluye los .php de cualquier subcarpeta.
+        if !anchored && !p.contains('/') {
             if let Ok(glob) = Glob::new(&format!("**/{p}")) {
                 builder.add(glob);
             }
@@ -89,5 +112,64 @@ pub fn is_included(set: &Option<GlobSet>, rel_posix: &str) -> bool {
     match set {
         None => true,
         Some(s) => s.is_match(rel_posix),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Atajo para construir el set de ignore con un solo patrón.
+    fn ign(patron: &str) -> GlobSet {
+        build(&[patron.to_string()]).unwrap()
+    }
+
+    #[test]
+    fn ignore_sin_barra_casa_en_cualquier_nivel() {
+        let set = ign("logs");
+        assert!(is_ignored(&set, "logs"));
+        assert!(is_ignored(&set, "logs/salida.txt"));
+        assert!(is_ignored(&set, "src/modulo/logs"));
+        assert!(is_ignored(&set, "src/modulo/logs/salida.txt"));
+        assert!(!is_ignored(&set, "src/app.js"));
+    }
+
+    #[test]
+    fn ignore_anclado_solo_primer_nivel() {
+        let set = ign("/logs");
+        // La carpeta del primer nivel y su contenido sí.
+        assert!(is_ignored(&set, "logs"));
+        assert!(is_ignored(&set, "logs/salida.txt"));
+        // La misma carpeta en profundidad NO.
+        assert!(!is_ignored(&set, "src/modulo/logs"));
+        assert!(!is_ignored(&set, "src/modulo/logs/salida.txt"));
+    }
+
+    #[test]
+    fn ignore_anclado_con_comodin() {
+        let set = ign("/dist/*.map");
+        assert!(is_ignored(&set, "dist/app.map"));
+        assert!(!is_ignored(&set, "src/dist/app.map"));
+    }
+
+    #[test]
+    fn include_sin_barra_casa_en_cualquier_nivel() {
+        let set = build_include(&["*.php".to_string()]).unwrap();
+        assert!(is_included(&set, "index.php"));
+        assert!(is_included(&set, "src/modulo/vista.php"));
+        assert!(!is_included(&set, "src/app.js"));
+    }
+
+    #[test]
+    fn include_anclado_solo_primer_nivel() {
+        let set = build_include(&["/app.js".to_string()]).unwrap();
+        assert!(is_included(&set, "app.js"));
+        assert!(!is_included(&set, "src/app.js"));
+    }
+
+    #[test]
+    fn include_vacio_o_todo_es_incluir_todo() {
+        assert!(build_include(&[]).unwrap().is_none());
+        assert!(build_include(&["**/*".to_string()]).unwrap().is_none());
     }
 }

@@ -4,6 +4,14 @@ Todas las novedades notables de este proyecto se documentan en este fichero.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.5.2] - 2026-10-22
+
+### Añadido
+- **Anclaje de patrones al primer nivel** en *Incluir* e *Ignorar*: un patrón con barra inicial (p. ej. `/logs`) se aplica solo a la raíz local, no a cualquier profundidad (estilo gitignore). Sin barra inicial, sigue casando en cualquier nivel.
+
+### Corregido
+- Los campos **Incluir** e **Ignorar** no dejaban crear líneas nuevas con comodidad (el salto de línea se descartaba al filtrar las vacías en cada pulsación). Ahora se editan como texto libre y se convierten a lista al salir del campo.
+
 ## [0.5.1] - 2026-06-28
 
 ### Corregido

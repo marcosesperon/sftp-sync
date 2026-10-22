@@ -30,6 +30,15 @@ import { detectLang, Lang, makeT } from "./i18n";
 import { useSshSession } from "./useSshSession";
 import "./App.css";
 
+// Convierte el texto libre de un campo multilínea (Incluir/Ignorar) en la lista
+// de patrones: una línea por patrón, sin espacios sobrantes ni líneas vacías.
+function parse_lineas(texto: string): string[] {
+  return texto
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 // Resumen legible de los argumentos de un comando, ocultando secretos.
 function summarizeArgs(args?: Record<string, unknown>): string {
   if (!args) return "";
@@ -163,6 +172,10 @@ function App() {
   const v_ssh = useSshSession(settings.theme);
   // Menú desplegable para elegir entre varias sesiones SSH.
   const [sshMenu, setSshMenu] = useState(false);
+  // Buffers de texto libre para los campos Incluir/Ignorar (se convierten a
+  // lista al salir del campo). Evita que el Enter "no cuaje" al filtrar vacías.
+  const [v_include_text, set_v_include_text] = useState("");
+  const [v_ignore_text, set_v_ignore_text] = useState("");
   const [explorerPath, setExplorerPath] = useState<string>("");
   const [explorerEntries, setExplorerEntries] = useState<RemoteEntry[]>([]);
   const [explorerLoading, setExplorerLoading] = useState(false);
@@ -381,6 +394,15 @@ function App() {
     window.addEventListener("click", v_close);
     return () => window.removeEventListener("click", v_close);
   }, [sshMenu]);
+
+  // Al cambiar de perfil, recarga los buffers de texto de Incluir/Ignorar desde
+  // el perfil (no depende del contenido, para no pisar lo que se está editando).
+  useEffect(() => {
+    const p = selectedProfileRef.current;
+    set_v_include_text((p?.include ?? []).join("\n"));
+    set_v_ignore_text((p?.ignore ?? []).join("\n"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   // Drag & drop de ficheros locales sobre el explorador → subir.
   useEffect(() => {
@@ -1346,14 +1368,10 @@ function App() {
                         <textarea
                           rows={3}
                           placeholder="**/*"
-                          value={(selected.include ?? []).join("\n")}
-                          onChange={(e) =>
-                            update({
-                              include: e.target.value
-                                .split("\n")
-                                .map((s) => s.trim())
-                                .filter(Boolean),
-                            })
+                          value={v_include_text}
+                          onChange={(e) => set_v_include_text(e.target.value)}
+                          onBlur={() =>
+                            update({ include: parse_lineas(v_include_text) })
                           }
                         />
                       </div>
@@ -1362,16 +1380,13 @@ function App() {
                         <label>{t("field.ignore")}</label>
                         <textarea
                           rows={4}
-                          value={selected.ignore.join("\n")}
-                          onChange={(e) =>
-                            update({
-                              ignore: e.target.value
-                                .split("\n")
-                                .map((s) => s.trim())
-                                .filter(Boolean),
-                            })
+                          value={v_ignore_text}
+                          onChange={(e) => set_v_ignore_text(e.target.value)}
+                          onBlur={() =>
+                            update({ ignore: parse_lineas(v_ignore_text) })
                           }
                         />
+                        <p className="settings-note">{t("patterns.hint")}</p>
                       </div>
 
                       <div className="checks">
@@ -1570,7 +1585,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="about-title">SFTP Sync</h2>
-            <p className="about-version">v0.5.1</p>
+            <p className="about-version">v0.5.2</p>
             <div className="about-author">
               <div className="about-name">Marcos Esperón</div>
               <button
